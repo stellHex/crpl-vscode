@@ -1,0 +1,5 @@
+if (TRUE)
+    "Yes!"
+else
+    "No!"
+endif

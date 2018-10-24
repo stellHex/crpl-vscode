@@ -1,0 +1,25 @@
+{
+    "comments": {
+        // symbol used for single line comment. Remove this entry if your language does not support line comments
+        "lineComment": "#",
+    },
+    "brackets": [
+        ["(", ")"],
+        ["else", "endif"],
+        ["if", "else"],
+        ["if", "endif"],
+        ["repeat", "endwhile"],
+        ["while", "repeat"],
+        ["while", "endwhile"],
+        ["do", "loop"],
+        ["once", "endonce"]
+    ],
+    "autoClosingPairs": [
+        ["(", ")"],
+        ["\"", "\""]
+    ],
+    "surroundingPairs": [
+        ["(", ")"],
+        ["\"", "\""]
+    ]
+}

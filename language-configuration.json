@@ -1,6 +1,5 @@
 {
     "comments": {
-        // symbol used for single line comment. Remove this entry if your language does not support line comments
         "lineComment": "#",
     },
     "brackets": [
@@ -21,5 +20,6 @@
     "surroundingPairs": [
         ["(", ")"],
         ["\"", "\""]
-    ]
+    ],
+    "wordPattern": "(<-|->|-\\?|--|@)[A-Za-z]\\w*\\b|\\$?\\b\\w*\\b:|\\b\\w+(\\.\\d*)?\\b|(<-!|->!|-\\?!|--\\?)(?=\\s|$)"
 }

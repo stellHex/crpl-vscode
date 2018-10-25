@@ -1,29 +1,58 @@
 'use strict';
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as tokenizer from 'vscode-textmate'
+import * as tmcrpl from './crpl.tmLanguage.json'
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+const MODE: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
+const wordPattern =  new RegExp("(<-|->|-\\?|--|@)[A-Za-z]\\w*\\b|\\$?\\b\\w*\\b:|\\b\\w+(\\.\\d*)?\\b|(<-!|->!|-\\?!|--\\?)(?=\\s|$)")
+const symbolPatterns: Map<RegExp, string> = new Map([
+  [/<-[A-Za-z]\w*\b/, 'read'],
+  [/->[A-Za-z]\w*\b/, 'write'],
+  [/-?[A-Za-z]\w*\b/, 'exists'],
+  [/--[A-Za-z]\w*\b/, 'delete'],
+  [/<-!/, 'refread'],
+  [/->!/, 'refwrite'],
+  [/-?!/, 'refexists'],
+  [/--?/, 'refdelete'],
+])
 
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
-    console.log('Congratulations, your extension "crpl-vscode" is now active!');
-
-    // The command has been defined in the package.json file
-    // Now provide the implementation of the command with  registerCommand
-    // The commandId parameter must match the command field in package.json
-    let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
-        // The code you place here will be executed every time your command is executed
-
-        // Display a message box to the user
-        vscode.window.showInformationMessage('Hello World!');
-    });
-
-    context.subscriptions.push(disposable);
+function tokenize(doc: vscode.TextDocument): [string, vscode.Position][] {
+  return []
 }
 
-// this method is called when your extension is deactivated
+class RichDoc {
+  doc: vscode.TextDocument
+  tokens: [string, vscode.Position][]
+  constructor(doc: vscode.TextDocument) {
+    this.doc = doc
+    this.tokens = tokenize(doc)
+  }
+}
+
+let documents: RichDoc[] = []
+
+export function activate(context: vscode.ExtensionContext) {
+
+  const watcher = vscode.workspace.createFileSystemWatcher('.crpl')
+  const push: (sub: vscode.Disposable) => number = context.subscriptions.push.bind(context.subscriptions)
+
+  push(watcher.onDidCreate(uri => {
+
+  }))
+  push(watcher.onDidDelete(uri => {
+    // documents.
+  }))
+  // vscode.workspace.onDidChangeTextDocument(
+
+  // )
+  push(vscode.languages.registerHoverProvider(MODE, {
+    provideHover (document, position, token) {
+      let wordRange = document.getWordRangeAtPosition(position, wordPattern)
+      let word = wordRange && document.getText(wordRange)
+      return word ? new vscode.Hover(word, wordRange) : undefined
+    }
+  }))
+}
+
 export function deactivate() {
 }

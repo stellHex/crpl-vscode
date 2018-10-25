@@ -30,13 +30,8 @@
       "name": "entity.name.function.call.user.crpl",
       "match": "\\b@[A-Za-z]\\w*\\b"
     }, {
-      "match": "((\")([^\"]*)(\")\\s+)?(--?|<-!|->!|-?!)",
-      "captures": {
-        "2": "string.quoted.crpl",
-        "3": "variable.other.reference.crpl",
-        "4": "string.quoted.crpl",
-        "5": "keyword.operator.variable.crpl"
-      }
+      "match": "(--?|<-!|->!|-?!)",
+      "name:": "keyword.operator.variable.crpl"
     }, {
       "match": "(--|<-|->|-?)([A-Za-z]\\w*)",
       "captures": {
@@ -108,7 +103,7 @@
       "match": "\\b(?i:CONST_ACPACKETREQUESTDELAY|CONST_AMMO|CONST_AMMOAC|CONST_BEAMTARGET|CONST_BUILDCOST|CONST_CANREQUESTAMMO|CONST_CELLHEIGHT|CONST_CELLWIDTH|CONST_CONNECTABLE|CONST_COORDX|CONST_COORDY|CONST_COUNTSFORVICTORY|CONST_CREATEPZ|CONST_DESTROYMODE|CONST_DESTROYONDAMAGE|CONST_HEALRATE|CONST_HEALTH|CONST_ISBUILDING|CONST_ISDESTROYED|CONST_ISLANDED|CONST_MAXAMMO|CONST_MAXAMMOAC|CONST_MAXHEALTH|CONST_NULLIFIERDAMAGEAMT|CONST_NULLIFIERDAMAGES|CONST_PACKETREQUESTDELAY|CONST_PIXELCOORDX|CONST_PIXELCOORDY|CONST_REQUESTACPACKETS|CONST_REQUESTPACKETS|CONST_SHOWAMMOACBAR|CONST_SHOWAMMOBAR|CONST_SHOWHEALTHBAR|CONST_SNIPERTARGET|CONST_SNIPERIGNORELOS|CONST_SUPPORTSDIGITALIS|CONST_TAKEMAPSPACE|CONST_THORTARGET)\\b"
     }, {
       "name": "entity.name.function.other.crpl",
-      "match": "\\b(?i:CreateEffect|CreateEffectClipped|FireAoo|PlaySound|SetCreeperColors|GetCreeperColors|CreateSpore|AddConversationMessage|ShowConversation|ClearConversation|DestroyConversation|ConversationShowing|ShowOpeningConversation|CloseOpeningConversation|CreateRunner|Trace|Trace2|Trace3|Trace4|Trace5|TraceStack|ShowTraceLog|ClearTraceLog|HideTraceLog|ShowMessage|ShowMessageDismissible|SetAdditionalScore|SetTechLimit|AddAdditionalScore|SetBuildLimit|ShowMessageDialog|CreateMist|CellToPixel|PixelToCell|SetScreenMode|SetScreenCoords|SetScreenCoordX|SetScreenCoordY|SetScreenPixelCoords|SetScreenPixelCoordX|SetScreenPixelCoordY|SetCameraPosition|SetCameraZoom|PauseGame|UnpauseGame|RandFloat|RandInt|SetGameTime|SetGameTimeFrames|FailMission|DestroyAllEnemyUnits|CreateIndicatorArrow|DestroyIndicatorArrow|ShowGameEventTag)\\b"
+      "match": "\\b(?i:CreateEffect|CreateEffectClipped|FireAoo|PlaySound|SetCreeperColors|GetCreeperColors|CreateSpore|AddConversationMessage|ShowConversation|ClearConversation|DestroyConversation|ConversationShowing|ShowOpeningConversation|CloseOpeningConversation|CreateRunner|Trace|Trace2|Trace3|Trace4|Trace5|TraceStack|ShowTraceLog|ClearTraceLog|HideTraceLog|ShowMessage|ShowMessageDismissible|SetAdditionalScore|SetTechLimit|AddAdditionalScore|SetBuildLimit|ShowMessageDialog|CreateMist|CellToPixel|PixelToCell|SetScreenMode|SetScreenCoords|SetScreenCoordX|SetScreenCoordY|SetScreenPixelCoords|SetScreenPixelCoordX|SetScreenPixelCoordY|SetCameraPosition|SetCameraZoom|PauseGame|UnpauseGame|RandFloat|RandInt|SetGameTime|SetGameTimeFrames|FailMission|DestroyAllEnemyUnits|CreateIndicatorArrow|DestroyIndicatorArrow|ShowGameEventTag|ClearLocals)\\b"
     }, {
       "name": "entity.name.function.image.crpl",
       "match": "\\b(?i:[SG]etImage(|Position|PositionX|PositionY|PositionZ|Scale|ScaleX|ScaleY|Rotation|Color)|RemoveImages)\\b"

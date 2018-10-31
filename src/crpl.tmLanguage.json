@@ -1,112 +1,188 @@
 {
   "scopeName": "source.crpl",
   "fileTypes": [".crpl"],
-  "patterns": [
-    {
-      "name": "comment.line.number-sign.crpl",
-      "match": "#.*"
-    }, {
-      "name": "string.quoted.crpl",
-      "begin": "\"", "end": "\""
-    }, {
-      "name": "meta.warp.crpl",
-      "begin": "\\(", "end": "\\)",
-      "patterns": [
-        { "include": "$self" }
-      ]
-    }, {
-      "name": "variable.parameter.crpl",
-      "match": "\\$[A-Za-z]\\w*:"
-    }, {
-      "name": "entity.name.function.definition.event.crpl",
-      "match": "\\b(?i::destroyed|:awake|:GameLoaded|:ShowMessageDialogCallback|:UserCancelAction)\\b"
-    }, {
-      "name": "entity.name.function.call.event.crpl",
-      "match": "\\b(?i:@destroyed|@awake|@GameLoaded|@ShowMessageDialogCallback|@UserCancelAction)\\b"
-    }, {
-      "name": "entity.name.function.definition.user.crpl",
-      "match": "\\b:[A-Za-z]\\w*\\b"
-    }, {
-      "name": "entity.name.function.call.user.crpl",
-      "match": "\\b@[A-Za-z]\\w*\\b"
-    }, {
-      "match": "(--?|<-!|->!|-?!)",
-      "name:": "keyword.operator.variable.crpl"
-    }, {
-      "match": "(--|<-|->|-?)([A-Za-z]\\w*)",
-      "captures": {
-        "1": "keyword.operator.variable.crpl",
-        "2": "variable.other.other.crpl"
-      }
-    }, {
-      "name": "keyword.operator.math.crpl",
-      "match": "\\b(?i:abs|add|asfloat|asint|approximately|div|max|min|mod|mul|neg|pow|sub)\\b"
-    }, {
-      "name": "entity.name.function.math.crpl",
-      "match": "\\b(?i:acos|asin|atan|atan2|ceil|cos|Deg2Rad|E|floor|ln|log|log10|PI|Rad2Deg|round|ShortestAngle|sin|sqrt|tan)\\b"
-    }, {
-      "name": "keyword.operator.stack.crpl",
-      "match": "\\b(?i:swap|dup|dup2|pop|ClearStack)\\b"
-    }, {
-      "name": "variable.language.stack.crpl",
-      "match": "\\b(?i:StackSize)\\b"
-    }, {
-      "name": "constant.numeric.crpl",
-      "match": "\\b(?i:E|PI|TRUE|FALSE|\\d*\\.?\\d*)\\b"
-    }, {
-      "name": "keyword.operator.logical.crpl",
-      "match": "\\b(?i:and|or|xor|not|gt|gte|lt|lte|eq|neq|eq0|neq0)\\b"
-    }, {
-      "name": "keyword.control.block.crpl",
-      "match": "\\b(?i:once|endonce|if|else|endif|do|loop|while|repeat|endwhile)\\b"
-    }, {
-      "name": "keyword.control.other.crpl",
-      "match": "\\b(?i:break|return|delay)\\b"
-    }, {
-      "name": "variable.language.loop.crpl",
-      "match": "\\b[IJKijk]\\b"
-    }, {
-      "name": "variable.language.timer.crpl",
-      "match": "\\b(?i:[GS]etTimer[0-3])\\b"
-    }, {
-      "name": "entity.name.function.string.crpl",
-      "match": "\\b(?i:Concat|Substring|StartsWith|EndsWith|Split|StringToList|ToUpper|ToLower|StringLength|StringReplace)\\b"
-    }, {
-      "name": "variable.language.input.crpl",
-      "match": "\\b(?i:GetKey|GetKeyDown|GetKeyUp|GetMouseButton|GetMouseButtonDown|GetMouseButtonUp|GetMousePosition|GetMouseCell|GetMouseScreenPosition|GetMouseScreenPixelPosition)\\b"
-    }, {
-      "name": "entity.name.function.input.crpl",
-      "match": "\\b(?i:EnableAlternateControlMode|EnableNormalMouse|EnableNormalKeyInput)\\b"
-    }, {
-      "name": "entity.name.function.list.crpl",
-      "match": "\\b(?i:CreateList|CreateListStartingSize|CopyList|DeepCopyList)\\b"
-    }, {
-      "name": "keyword.operator.list.crpl",
-      "match": "\\b(?i:GetListCount|GetListElement|SetListElement|InsertListElement|RemoveListElement|AppendToList|PrependToList|AppendStackToList|PrependStackToList)\\b"
-    }, {
-      "name": "entity.name.function.unit.crpl",
-      "match": "\\b(?i:QueueMove|AbortMove|SuspendMove|ClearQueuedMoves)\\b"
-    }, {
-      "name": "variable.language.unit.crpl",
-      "match": "\\b(?i:GetQueuedMoveCount|GetTargetOffsetX|GetTargetOffsetY|SetTargetOffsetX|SetTargetOffsetY|CurrentCoords|CurrentX|CurrentY|SetCurrentCoords|SetCurrentX|SetCurrentY|CurrentPixelCoords|Self|GetUpdateCount|InvocationCount)\\b"
-    }, {
-      "name": "entity.name.function.unit.crpl",
-      "match": "\\b(GetUnitTargetOffsetX|GetUnitTargetOffsetY|SetUnitTargetOffsetX|SetUnitTargetOffsetY|AddScriptToUnit|GetScriptVar|SetScriptVar|GetUnitAttribute|SetUnitAttribute|GetUnitCountInRange|GetCommandNodeCount|RandUnitCoords|GetUnitsInRange|GetEnemyUnitsInRange|GetAllUnitsInRange|GetNearestGroundEnemy|GetCoresWithVar|CreateUnit|Damage|Destroy|GetUnitType|GetUnitAt|GetUnitTransformPosition|GetTechArtifactType|SetTechArtifactType|ArtifactCollected|EnableTowerField|DisableTowerField|DropFromOrbit|AscendToOrbit|SetPopupText|SetPopupTextAlwaysVisible|SetPopupTextX|SetPopupTextY|SetText|SetTextAnchor|SetTextColor|SetTextSize|SetTextX|SetTextY|GetRunnerCount||NotPersist|OperateWhilePaused)\\b"
-    }, {
-      "name": "entity.name.function.map.crpl",
-      "match": "\\b(?i:GetTerrain|SetTerrain|GetTerrainOverride|SetTerrainOverride|GetWall|SetWall|GetVoid|SetVoid|IsTerrainLOS|FloodFillTerrain|PathFindTerrain|GetDigitalis|SetDigitalis|GetDigitalisGrowth|SetDigitalisGrowth|GetDigitalisRaw|SetDigitalisRaw|IsDigitalisConnected|GetCellOccupiedCount|SetCellOccupiedCount|AddCreeper|DamageCreeper|SetCreeperNoLower|IsCreeperInRange|SetCreeper|GetCreeper|MakeRain|SetCreeperFlowRate|SetCreeperFlowRateOnDigitalis|SetCreeperFlowRateRL|SetCreeperFlowRateOnDigitalisRL|SetCreeperFlowRateUD|SetCreeperFlowRateOnDigitalisUD|SetWind|SetCreeperEvaporationLimit|SetCreeperMax|SetAntiCreeperMax|GetDeepestCreeperCell|GetPinFieldCell|SetPinFieldCell|SetFieldCell|GetFieldCell|RandCoords|RandXCoord|RandYCoord|RandCoordsInRange|Distance)\\b"
-    }, {
-      "name": "variable.language.other.crpl",
-      "match": "\\b(?i:GetScore|GetAdditionalScore|GetTechLimit|WasMessageDismissed|IsMessageDialogShowing|ScreenHeight|ScreenWidth|GetGlobalRunnerCount|GetCameraPosition|GetCameraZoom|MapWidth|MapHeight|GetCurrentBuildTab|IsPaused|IsEditMode|GetGameTimeFrames|ElapsedTime)\\b"
-    }, {
-      "name": "constant.language.attribute.crpl",
-      "match": "\\b(?i:CONST_ACPACKETREQUESTDELAY|CONST_AMMO|CONST_AMMOAC|CONST_BEAMTARGET|CONST_BUILDCOST|CONST_CANREQUESTAMMO|CONST_CELLHEIGHT|CONST_CELLWIDTH|CONST_CONNECTABLE|CONST_COORDX|CONST_COORDY|CONST_COUNTSFORVICTORY|CONST_CREATEPZ|CONST_DESTROYMODE|CONST_DESTROYONDAMAGE|CONST_HEALRATE|CONST_HEALTH|CONST_ISBUILDING|CONST_ISDESTROYED|CONST_ISLANDED|CONST_MAXAMMO|CONST_MAXAMMOAC|CONST_MAXHEALTH|CONST_NULLIFIERDAMAGEAMT|CONST_NULLIFIERDAMAGES|CONST_PACKETREQUESTDELAY|CONST_PIXELCOORDX|CONST_PIXELCOORDY|CONST_REQUESTACPACKETS|CONST_REQUESTPACKETS|CONST_SHOWAMMOACBAR|CONST_SHOWAMMOBAR|CONST_SHOWHEALTHBAR|CONST_SNIPERTARGET|CONST_SNIPERIGNORELOS|CONST_SUPPORTSDIGITALIS|CONST_TAKEMAPSPACE|CONST_THORTARGET)\\b"
-    }, {
-      "name": "entity.name.function.other.crpl",
-      "match": "\\b(?i:CreateEffect|CreateEffectClipped|FireAoo|PlaySound|SetCreeperColors|GetCreeperColors|CreateSpore|AddConversationMessage|ShowConversation|ClearConversation|DestroyConversation|ConversationShowing|ShowOpeningConversation|CloseOpeningConversation|CreateRunner|Trace|Trace2|Trace3|Trace4|Trace5|TraceStack|ShowTraceLog|ClearTraceLog|HideTraceLog|ShowMessage|ShowMessageDismissible|SetAdditionalScore|SetTechLimit|AddAdditionalScore|SetBuildLimit|ShowMessageDialog|CreateMist|CellToPixel|PixelToCell|SetScreenMode|SetScreenCoords|SetScreenCoordX|SetScreenCoordY|SetScreenPixelCoords|SetScreenPixelCoordX|SetScreenPixelCoordY|SetCameraPosition|SetCameraZoom|PauseGame|UnpauseGame|RandFloat|RandInt|SetGameTime|SetGameTimeFrames|FailMission|DestroyAllEnemyUnits|CreateIndicatorArrow|DestroyIndicatorArrow|ShowGameEventTag|ClearLocals)\\b"
-    }, {
-      "name": "entity.name.function.image.crpl",
-      "match": "\\b(?i:[SG]etImage(|Position|PositionX|PositionY|PositionZ|Scale|ScaleX|ScaleY|Rotation|Color)|RemoveImages)\\b"
+  "patterns": [{
+      "include": "#language"
     }
-  ]
+  ],
+  "repository": {
+    "function": {
+      "name": "meta.func.crpl",
+      "begin": "(?i)((:destroyed|:awake|:GameLoaded|:ShowMessageDialogCallback|:UserCancelAction)\\b|(:[A-Za-z]\\w*))",
+      "end": "(?=:[A-Za-z]\\w*)",
+      "patterns": [{ "include": "#language" }],
+      "beginCaptures": {
+        "2": { "name": "entity.name.function.definition.event.crpl" },
+        "3": { "name": "entity.name.function.definition.user.crpl" }
+      }
+    },
+    "control": { "patterns": [{
+        "name": "meta.block.simple.crpl",
+        "begin": "(?i)\\b(once)\\b",
+        "end": "(?i)\\b(endonce)\\b",
+        "captures": { "1": { "name": "keyword.control.block.once.crpl" }},
+        "patterns": [{ "include": "#language" }]
+      }, {
+        "name": "meta.block.simple.crpl",
+        "begin": "(?i)\\b(do)\\b",
+        "end": "(?i)\\b(loop)\\b",
+        "captures": { "1": { "name": "keyword.control.block.do.crpl" }},
+        "patterns": [{ "include": "#language" }]
+      }, {
+        "name": "meta.block.while.while.crpl",
+        "begin": "(?i)\\b(while)\\b",
+        "end": "(?i)(?<=endwhile)",
+        "beginCaptures": { "1": { "name": "keyword.control.block.while.crpl" }},
+        "patterns": [
+          {
+            "name": "meta.block.while.condition.crpl",
+            "begin": "(?i)(?<=while)",
+            "end": "(?i)\\b(repeat)\\b",
+            "endCaptures": { "1": { "name": "keyword.control.block.while.crpl" }},
+            "patterns": [
+              { "include": "#language" }
+            ]
+          }, {
+            "name": "meta.block.while.body.crpl",
+            "begin": "(?i)(?<=repeat)",
+            "end": "(?i)\\b(endwhile)\\b",
+            "endCaptures": { "1": { "name": "keyword.control.block.while.crpl" }},
+            "patterns": [
+              { "include": "#language" }
+            ]
+          }
+        ]
+      }, {
+        "name": "meta.block.if.if.crpl",
+        "begin": "(?i)\\b(if)\\b",
+        "end": "(?i)(?<=endif)",
+        "beginCaptures": { "1": { "name": "keyword.control.block.if.crpl" }},
+        "patterns": [
+          {
+            "name": "meta.block.if.then.crpl",
+            "begin": "(?i)(?<=if)",
+            "end": "(?i)\\b(else|endif)\\b",
+            "endCaptures": { "1": { "name": "keyword.control.block.if.crpl" }},
+            "patterns": [
+              { "include": "#language" }
+            ]
+          }, {
+            "name": "meta.block.if.else.crpl",
+            "begin": "(?i)(?<=else)",
+            "end": "(?i)\\b(endif)\\b",
+            "endCaptures": { "1": { "name": "keyword.control.block.if.crpl" }},
+            "patterns": [
+              { "include": "#language" }
+            ]
+          }
+        ]
+      }
+    ]}, "language": { "patterns": [
+      {
+        "name": "comment.line.number-sign.crpl",
+        "match": "#.*"
+      }, {
+        "include": "#control"
+      }, {
+        "name": "invalid.illegal.block.crpl",
+        "match": "(?i)\\b(endonce|else|endif|loop|repeat|endwhile)\\b"
+      }, {
+        "name": "string.quoted.crpl",
+        "begin": "\"", "end": "\""
+      }, {
+        "name": "meta.warp.crpl",
+        "begin": "\\(", "end": "\\)",
+        "patterns": [
+          { "include": "$self" }
+        ]
+      }, {
+        "name": "variable.parameter.crpl",
+        "start": "\\$[A-Za-z]\\w*:[^\\s]"
+      }, {
+        "name": "entity.name.function.call.event.crpl",
+        "match": "(?i)\\b(@destroyed|@awake|@GameLoaded|@ShowMessageDialogCallback|@UserCancelAction)\\b"
+      }, {
+        "name": "entity.name.function.call.user.crpl",
+        "match": "\\b@[A-Za-z]\\w*\\b"
+      }, {
+        "match": "(--\\?|<-!|->!|-\\?!)",
+        "name:": "keyword.operator.variable.crpl"
+      }, {
+        "match": "(--|<-|->|-\\?)([A-Za-z]\\w*)",
+        "captures": {
+          "1": { "name": "keyword.operator.variable.crpl" },
+          "2": { "name": "variable.other.crpl" }
+        }
+      }, {
+        "name": "keyword.operator.math.crpl",
+        "match": "(?i)\\b(abs|add|asfloat|asint|approximately|div|max|min|mod|mul|neg|pow|sub)\\b"
+      }, {
+        "name": "entity.name.function.math.crpl",
+        "match": "(?i)\\b(acos|asin|atan|atan2|ceil|cos|Deg2Rad|E|floor|ln|log|log10|PI|Rad2Deg|round|ShortestAngle|sin|sqrt|tan)\\b"
+      }, {
+        "name": "keyword.operator.stack.crpl",
+        "match": "(?i)\\b(swap|dup|dup2|pop|ClearStack)\\b"
+      }, {
+        "name": "variable.language.stack.crpl",
+        "match": "(?i)\\b(StackSize)\\b"
+      }, {
+        "name": "constant.numeric.crpl",
+        "match": "(?i)\\b(E|PI|TRUE|FALSE|\\d+\\.?\\d*)\\b"
+      }, {
+        "name": "keyword.operator.logical.crpl",
+        "match": "(?i)\\b(and|or|xor|not|gt|gte|lt|lte|eq|neq|eq0|neq0)\\b"
+      }, {
+        "name": "keyword.control.other.crpl",
+        "match": "(?i)\\b(break|return|delay)\\b"
+      }, {
+        "name": "variable.language.loop.crpl",
+        "match": "\\b[IJKijk]\\b"
+      }, {
+        "name": "variable.language.timer.crpl",
+        "match": "(?i)\\b([GS]etTimer[0-3])\\b"
+      }, {
+        "name": "entity.name.function.string.crpl",
+        "match": "(?i)\\b(Concat|Substring|StartsWith|EndsWith|Split|StringToList|ToUpper|ToLower|StringLength|StringReplace)\\b"
+      }, {
+        "name": "variable.language.input.crpl",
+        "match": "(?i)\\b(GetKey|GetKeyDown|GetKeyUp|GetMouseButton|GetMouseButtonDown|GetMouseButtonUp|GetMousePosition|GetMouseCell|GetMouseScreenPosition|GetMouseScreenPixelPosition)\\b"
+      }, {
+        "name": "entity.name.function.input.crpl",
+        "match": "(?i)\\b(EnableAlternateControlMode|EnableNormalMouse|EnableNormalKeyInput)\\b"
+      }, {
+        "name": "entity.name.function.list.crpl",
+        "match": "(?i)\\b(CreateList|CreateListStartingSize|CopyList|DeepCopyList)\\b"
+      }, {
+        "name": "keyword.operator.list.crpl",
+        "match": "(?i)\\b(GetListCount|GetListElement|SetListElement|InsertListElement|RemoveListElement|AppendToList|PrependToList|AppendStackToList|PrependStackToList)\\b"
+      }, {
+        "name": "entity.name.function.unit.crpl",
+        "match": "(?i)\\b(QueueMove|AbortMove|SuspendMove|ClearQueuedMoves)\\b"
+      }, {
+        "name": "variable.language.unit.crpl",
+        "match": "(?i)\\b(GetQueuedMoveCount|GetTargetOffsetX|GetTargetOffsetY|SetTargetOffsetX|SetTargetOffsetY|CurrentCoords|CurrentX|CurrentY|SetCurrentCoords|SetCurrentX|SetCurrentY|CurrentPixelCoords|Self|GetUpdateCount|InvocationCount)\\b"
+      }, {
+        "name": "entity.name.function.unit.crpl",
+        "match": "(?i)\\b(GetUnitTargetOffsetX|GetUnitTargetOffsetY|SetUnitTargetOffsetX|SetUnitTargetOffsetY|AddScriptToUnit|GetScriptVar|SetScriptVar|GetUnitAttribute|SetUnitAttribute|GetUnitCountInRange|GetCommandNodeCount|RandUnitCoords|GetUnitsInRange|GetEnemyUnitsInRange|GetAllUnitsInRange|GetNearestGroundEnemy|GetCoresWithVar|CreateUnit|Damage|Destroy|GetUnitType|GetUnitAt|GetUnitTransformPosition|GetTechArtifactType|SetTechArtifactType|ArtifactCollected|EnableTowerField|DisableTowerField|DropFromOrbit|AscendToOrbit|SetPopupText|SetPopupTextAlwaysVisible|SetPopupTextX|SetPopupTextY|SetText|SetTextAnchor|SetTextColor|SetTextSize|SetTextX|SetTextY|GetRunnerCount|NotPersist|OperateWhilePaused)\\b"
+      }, {
+        "name": "entity.name.function.map.crpl",
+        "match": "(?i)\\b(GetTerrain|SetTerrain|GetTerrainOverride|SetTerrainOverride|GetWall|SetWall|GetVoid|SetVoid|IsTerrainLOS|FloodFillTerrain|PathFindTerrain|GetDigitalis|SetDigitalis|GetDigitalisGrowth|SetDigitalisGrowth|GetDigitalisRaw|SetDigitalisRaw|IsDigitalisConnected|GetCellOccupiedCount|SetCellOccupiedCount|AddCreeper|DamageCreeper|SetCreeperNoLower|IsCreeperInRange|SetCreeper|GetCreeper|MakeRain|SetCreeperFlowRate|SetCreeperFlowRateOnDigitalis|SetCreeperFlowRateRL|SetCreeperFlowRateOnDigitalisRL|SetCreeperFlowRateUD|SetCreeperFlowRateOnDigitalisUD|SetWind|SetCreeperEvaporationLimit|SetCreeperMax|SetAntiCreeperMax|GetDeepestCreeperCell|GetPinFieldCell|SetPinFieldCell|SetFieldCell|GetFieldCell|RandCoords|RandXCoord|RandYCoord|RandCoordsInRange|Distance)\\b"
+      }, {
+        "name": "variable.language.other.crpl",
+        "match": "(?i)\\b(GetScore|GetAdditionalScore|GetTechLimit|WasMessageDismissed|IsMessageDialogShowing|ScreenHeight|ScreenWidth|GetGlobalRunnerCount|GetCameraPosition|GetCameraZoom|MapWidth|MapHeight|GetCurrentBuildTab|IsPaused|IsEditMode|GetGameTimeFrames|ElapsedTime)\\b"
+      }, {
+        "name": "constant.language.attribute.crpl",
+        "match": "(?i)\\b(CONST_ACPACKETREQUESTDELAY|CONST_AMMO|CONST_AMMOAC|CONST_BEAMTARGET|CONST_BUILDCOST|CONST_CANREQUESTAMMO|CONST_CELLHEIGHT|CONST_CELLWIDTH|CONST_CONNECTABLE|CONST_COORDX|CONST_COORDY|CONST_COUNTSFORVICTORY|CONST_CREATEPZ|CONST_DESTROYMODE|CONST_DESTROYONDAMAGE|CONST_HEALRATE|CONST_HEALTH|CONST_ISBUILDING|CONST_ISDESTROYED|CONST_ISLANDED|CONST_MAXAMMO|CONST_MAXAMMOAC|CONST_MAXHEALTH|CONST_NULLIFIERDAMAGEAMT|CONST_NULLIFIERDAMAGES|CONST_PACKETREQUESTDELAY|CONST_PIXELCOORDX|CONST_PIXELCOORDY|CONST_REQUESTACPACKETS|CONST_REQUESTPACKETS|CONST_SHOWAMMOACBAR|CONST_SHOWAMMOBAR|CONST_SHOWHEALTHBAR|CONST_SNIPERTARGET|CONST_SNIPERIGNORELOS|CONST_SUPPORTSDIGITALIS|CONST_TAKEMAPSPACE|CONST_THORTARGET)\\b"
+      }, {
+        "name": "entity.name.function.other.crpl",
+        "match": "(?i)\\b(CreateEffect|CreateEffectClipped|FireAoo|PlaySound|SetCreeperColors|GetCreeperColors|CreateSpore|AddConversationMessage|ShowConversation|ClearConversation|DestroyConversation|ConversationShowing|ShowOpeningConversation|CloseOpeningConversation|CreateRunner|Trace|Trace2|Trace3|Trace4|Trace5|TraceStack|ShowTraceLog|ClearTraceLog|HideTraceLog|ShowMessage|ShowMessageDismissible|SetAdditionalScore|SetTechLimit|AddAdditionalScore|SetBuildLimit|ShowMessageDialog|CreateMist|CellToPixel|PixelToCell|SetScreenMode|SetScreenCoords|SetScreenCoordX|SetScreenCoordY|SetScreenPixelCoords|SetScreenPixelCoordX|SetScreenPixelCoordY|SetCameraPosition|SetCameraZoom|PauseGame|UnpauseGame|RandFloat|RandInt|SetGameTime|SetGameTimeFrames|FailMission|DestroyAllEnemyUnits|CreateIndicatorArrow|DestroyIndicatorArrow|ShowGameEventTag|ClearLocals)\\b"
+      }, {
+        "name": "entity.name.function.image.crpl",
+        "match": "(?i)\\b([SG]etImage(|Position|PositionX|PositionY|PositionZ|Scale|ScaleX|ScaleY|Rotation|Color)|RemoveImages)\\b"
+      }, {
+        "name": "entity.name.function.image.crpl",
+        "match": "(?i)\\b([SG]etImage(|Position|PositionX|PositionY|PositionZ|Scale|ScaleX|ScaleY|Rotation|Color)|RemoveImages)\\b"
+      }
+    ]}
+  }
 }

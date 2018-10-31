@@ -1,5 +1,23 @@
+$pirameter:3.14
 if (TRUE)
-    "Yes!"
+    "Yes!" ->exclamation
+    5 do
+        Self Self CONST_HEALTH GetUnitAttribute
+        1 add CONST_HEALTH SetUnitAttribute
+    loop
 else
-    "No!"
+    once
+        "No!" ->exclamation
+        while
+            Self CONST_HEALTH GetUnitAttribute
+        repeat
+            Self Self CONST_HEALTH GetUnitAttribute
+            1 sub CONST_HEALTH SetUnitAttribute
+        endwhile
+    endonce
 endif
+endif
+:funca
+"blah"
+:funcb
+"bleh"

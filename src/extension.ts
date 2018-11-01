@@ -12,9 +12,9 @@ const symbolPatterns = new Map([
   [/->[A-Za-z]\w*\b/, 'write'],
   [/-\?[A-Za-z]\w*\b/, 'exists'],
   [/--[A-Za-z]\w*\b/, 'delete'],
-  [/\$[A-Za-z]\w*/, 'define'],
+  [/\$[A-Za-z]\w*\b/, 'define'],
   [/@[A-Za-z]\w*\b/, 'call'],
-  [/:\w[A-Za-z]\w*/, 'func'],
+  [/:\w[A-Za-z]\w*\b/, 'func'],
   [/<-!/, 'refread'],
   [/->!/, 'refwrite'],
   [/-\?!/, 'refexists'],
@@ -30,7 +30,8 @@ interface RichToken {
   token: string
   range: vscode.Range
   id: string | undefined
-  error: boolean
+  error: string | false
+  wiki: boolean
 }
 
 interface WordInTheHand {
@@ -39,12 +40,38 @@ interface WordInTheHand {
   tokenMatch: RichToken | undefined
 }
 
+type ParseTree = ParseTreeHelper | RichToken
+interface ParseTreeHelper extends Array<ParseTree> {}
+
 class RichDoc {
-  static tokenPattern = /"[^"]*"|\$\w+|[(:)]|\S+/g
+  static tokenPattern = /"[^"]*"|[$:]\w+|[(:)]|#.*|\S+/g
   static valuePattern = /"[^"]*"|-?\d+(\.\d*)?/
+  static stackSpec = {
+    up: ['(', 'func', 'do', 'once', 'if', 'else', 'while', 'repeat'],
+    down: new Map<string,string|RegExp>([
+      [')', '('],
+      ['func', /^(func|start)$/],
+      ['loop', 'do'],
+      ['endonce', 'once'],
+      ['else', 'if'],
+      ['endif', /^(if|else)$/],
+      ['repeat', 'while'],
+      ['endwhile', 'repeat']
+    ])
+  }
+  static startToken = <RichToken>{
+    token: '',
+    range: <vscode.Range>{
+      start: <vscode.Position>{line: 0, character: 0},
+      end: <vscode.Position>{line: 0, character: 0}
+    },
+    error: false,
+    wiki: false
+  }
 
   doc: vscode.TextDocument
   tokens: RichToken[] = []
+  tree: ParseTree = [RichDoc.startToken]
   constructor(docref: vscode.TextDocument | vscode.Uri) {
     if ((<vscode.TextDocument>docref).getText) {
       this.doc = <vscode.TextDocument>docref
@@ -55,26 +82,39 @@ class RichDoc {
   }
 
   tokenize() {
-    let doc: vscode.TextDocument = this.doc
     this.tokens = []
+    this.tree = [RichDoc.startToken]
+    let stack: RichToken[] = []
+    function pop() { return stack.length ? stack.pop() : '' }
+    function push(token: RichToken) { stack.push(token) }
+
+    let doc = this.doc
+    let parametric = true
+    let comment = false
     // Here, replace is used as "for each match, do..."
     doc.getText().replace(RichDoc.tokenPattern, (token, offset) => {
-      let id: string | undefined
-      let error = false
+      let id: string|undefined
+      let wiki: boolean = false
+      let error: string|false = false
       let lowerToken = token.toLowerCase()
-      if (token[0] === '"') { id = undefined }
+      if (token[0] === '"') { id = 'value' }
       else if (crplData.words.indexOf(lowerToken) > -1) { id = lowerToken }
       else if (crplData.unitConstants.hasOwnProperty(lowerToken)) { id = lowerToken }
+      else if (/-?\d+(.\d*)?/.test(token)) { id = 'value' }  
       else {
         symbolPatterns.forEach((name, re) => {
-          if (re.test(token)) { id = name }
+          if (re.test(token)) {
+            id = name
+            wiki = true
+          }
         })
-        error = !id
+        error = id ? `Unknown token "${token}."` : false
       }
-      this.tokens.push({
-        token, id, error,
+      let richToken = <RichToken>{
+        token, id, error, wiki,
         range: new vscode.Range(doc.positionAt(offset), doc.positionAt(offset + token.length))
-      })
+      }
+      this.tokens.push(richToken)
       return ''
     })
   }

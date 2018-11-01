@@ -2,9 +2,11 @@
   "scopeName": "source.crpl",
   "fileTypes": [".crpl"],
   "patterns": [{
-      "include": "#function"
+      "include": "#parameter"
     }, {
       "include": "#language"
+    }, {
+      "include": "#function"
     }
   ],
   "repository": {
@@ -17,6 +19,10 @@
         "2": { "name": "entity.name.function.definition.event.crpl" },
         "3": { "name": "entity.name.function.definition.user.crpl" }
       }
+    }, 
+    "parameter": {
+      "name": "variable.parameter.crpl",
+      "match": "\\$[A-Za-z]\\w*:(?=\\s*(-?\\d+\\.?\\d*|\"))"
     },
     "control": { "patterns": [{
         "name": "meta.block.simple.crpl",
@@ -98,9 +104,6 @@
           { "include": "$self" }
         ]
       }, {
-        "name": "variable.parameter.crpl",
-        "start": "\\$[A-Za-z]\\w*:"
-      }, {
         "name": "entity.name.function.call.event.crpl",
         "match": "(?i)\\b(@destroyed|@awake|@GameLoaded|@ShowMessageDialogCallback|@UserCancelAction)\\b"
       }, {
@@ -129,7 +132,7 @@
         "match": "(?i)\\b(StackSize)\\b"
       }, {
         "name": "constant.numeric.crpl",
-        "match": "(?i)\\b(E|PI|TRUE|FALSE|\\d+\\.?\\d*)\\b"
+        "match": "(?i)\\b(E|PI|TRUE|FALSE|-?\\d+\\.?\\d*)\\b"
       }, {
         "name": "keyword.operator.logical.crpl",
         "match": "(?i)\\b(and|or|xor|not|gt|gte|lt|lte|eq|neq|eq0|neq0)\\b"

@@ -2,16 +2,17 @@
 import * as vscode from 'vscode'
 import * as request from 'request-promise'
 import entityDecode = require('decode-html')
-import crplDocs = require('./crpl-docs.json')
+import crplData = require('./crpl-data.json')
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
-const wordPattern = /(<-|->|-\?|--|@|:)[A-Za-z]\w*\b|\$?\b\w*\b(?=:)|\b\d+(\.\d*)?\b|(<-!|->!|-\?!|--\?)(?=\s|$)|\w+/
+const wordPattern = /(<-|->|-\?|--|@|:)[A-Za-z]\w*\b|\$?\b\w*\b(?=:)|-?\b\d+(\.\d*)?\b|(<-!|->!|-\?!|--\?)(?=\s|$)|\w+|[(:)]/
+// note: this should be different from language-configuration.json.wordPattern only in the appending of |[(:)]
 const symbolPatterns = new Map([
   [/<-[A-Za-z]\w*\b/, 'read'],
   [/->[A-Za-z]\w*\b/, 'write'],
   [/-\?[A-Za-z]\w*\b/, 'exists'],
   [/--[A-Za-z]\w*\b/, 'delete'],
-  [/\$[A-Za-z]\w*:/, 'define'],
+  [/\$[A-Za-z]\w*/, 'define'],
   [/@[A-Za-z]\w*\b/, 'call'],
   [/:\w[A-Za-z]\w*/, 'func'],
   [/<-!/, 'refread'],
@@ -39,7 +40,8 @@ interface WordInTheHand {
 }
 
 class RichDoc {
-  static tokenPattern = /"[^"]*"|\S+/g
+  static tokenPattern = /"[^"]*"|\$\w+|[(:)]|\S+/g
+  static valuePattern = /"[^"]*"|-?\d+(\.\d*)?/
 
   doc: vscode.TextDocument
   tokens: RichToken[] = []
@@ -61,13 +63,13 @@ class RichDoc {
       let error = false
       let lowerToken = token.toLowerCase()
       if (token[0] === '"') { id = undefined }
-      else if (crplDocs.words.indexOf(lowerToken) > -1) { id = lowerToken }
-      else if (crplDocs.unitConstants.hasOwnProperty(lowerToken)) { id = lowerToken }
+      else if (crplData.words.indexOf(lowerToken) > -1) { id = lowerToken }
+      else if (crplData.unitConstants.hasOwnProperty(lowerToken)) { id = lowerToken }
       else {
         symbolPatterns.forEach((name, re) => {
           if (re.test(token)) { id = name }
         })
-        error = !token
+        error = !id
       }
       this.tokens.push({
         token, id, error,
@@ -162,9 +164,9 @@ export function activate(context: vscode.ExtensionContext) {
         try {
           if (tokenMatch && tokenMatch.id !== undefined) {
             if (tokenMatch.id.startsWith('const_')) {
-              return new vscode.Hover(`\`${tokenMatch.id.toUpperCase()}\`: ${(crplDocs.unitConstants as any)[tokenMatch.id]}`, wordRange)
+              return new vscode.Hover(`\`${tokenMatch.id.toUpperCase()}\`: ${(crplData.unitConstants as any)[tokenMatch.id]}`, wordRange)
             }
-            let docs = await request(crplDocs.prefix + tokenMatch.id + crplDocs.suffix)
+            let docs = await request(crplData.prefix + tokenMatch.id + crplData.suffix)
             return new vscode.Hover(docuWikiDocToMD(docs), wordRange)
           } else {
             return undefined
@@ -181,7 +183,7 @@ export function activate(context: vscode.ExtensionContext) {
       let { wordRange, word } = richDoc.getWord(position.with(undefined, position.character - 1))
       if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
         let result = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
-        result.push(...completionFilter(crplDocs.completionList, word, '9'))
+        result.push(...completionFilter(crplData.completionList, word, '9'))
         let dupelog: string[] = []
         result.forEach( (c, i) => {
           if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label) }

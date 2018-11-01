@@ -17,6 +17,7 @@ else
     endonce
 endif
 endif
+
 :funca
 "blah"
 :funcb

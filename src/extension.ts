@@ -5,19 +5,24 @@ import entityDecode = require('decode-html')
 import crplDocs = require('./crpl-docs.json')
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
-const wordPattern = /(<-|->|-\?|--|@|:)[A-Za-z]\w*\b|\$?\b\w*\b:|\b\w+(\.\d*)?\b|(<-!|->!|-\?!|--\?)(?=\s|$)/
-const symbolPatterns: Map<RegExp, string> = new Map([
+const wordPattern = /(<-|->|-\?|--|@|:)[A-Za-z]\w*\b|\$?\b\w*\b(?=:)|\b\d+(\.\d*)?\b|(<-!|->!|-\?!|--\?)(?=\s|$)|\w+/
+const symbolPatterns = new Map([
   [/<-[A-Za-z]\w*\b/, 'read'],
   [/->[A-Za-z]\w*\b/, 'write'],
   [/-\?[A-Za-z]\w*\b/, 'exists'],
   [/--[A-Za-z]\w*\b/, 'delete'],
+  [/\$[A-Za-z]\w*:/, 'define'],
   [/@[A-Za-z]\w*\b/, 'call'],
-  [/\w[A-Za-z]\w*:/, 'func'],
+  [/:\w[A-Za-z]\w*/, 'func'],
   [/<-!/, 'refread'],
   [/->!/, 'refwrite'],
   [/-\?!/, 'refexists'],
   [/--\?/, 'refdelete'],
 ])
+const prefixPatterns = [
+  /^(<-|->|--|-\?|\$)(?=[A-Za-z])/,
+  /^(:|)(?=[A-Za-z])/
+]
 const docPattern = /=====\s*(.*)\s*=====\s*(.*\s*)*?.*Arguments.*\^\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|(.*?)\|(.*\s*)*?===\s*Description.*\s*((.*\s*)*)/
 
 interface RichToken {
@@ -112,6 +117,24 @@ function docuWikiDocToMD (crplHTML: string): string[] {
   }
 }
 
+function completionFilter(completionList: string[], word: string, sortPrefix: string) {
+  let pattern: RegExp = /^/
+  prefixPatterns.forEach(p => {
+    if (p.test(word)) { pattern = p }
+  });
+  let prefix = (<RegExpExecArray>pattern.exec(word))[0]
+
+  let niceWord = word.toLowerCase().replace(pattern, '')
+  let result = completionList
+    .map(s => s.replace(pattern, ''))
+    .filter(completion => completion.toLowerCase().startsWith(niceWord))
+    .map(s => prefix + s)
+  return result.map(c => <vscode.CompletionItem>{
+    label: c,
+    sortText: sortPrefix + c
+  })
+}
+
 let documents: Map<string, RichDoc> = new Map
 
 export function activate(context: vscode.ExtensionContext) {
@@ -146,7 +169,7 @@ export function activate(context: vscode.ExtensionContext) {
           } else {
             return undefined
           }
-        } catch(err){ console.log(err) }
+        } catch(err) { console.log(err) }
       } else {
         return undefined
       }
@@ -155,11 +178,16 @@ export function activate(context: vscode.ExtensionContext) {
   push(vscode.languages.registerCompletionItemProvider(crplSelector, {
     async provideCompletionItems (document, position, token) {
       let richDoc = <RichDoc>documents.get(document.uri.toString())
-      let { wordRange, word, tokenMatch } = richDoc.getWord(position)
+      let { wordRange, word } = richDoc.getWord(position.with(undefined, position.character - 1))
       if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
-        return crplDocs.completionList
-          .filter(completion => completion.toLowerCase().startsWith((<string>word).toLowerCase()))
-          .map(completion => new vscode.CompletionItem(completion))
+        let result = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
+        result.push(...completionFilter(crplDocs.completionList, word, '9'))
+        let dupelog: string[] = []
+        result.forEach( (c, i) => {
+          if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label) }
+          else { delete result[i] }
+        })
+        return result
       } else {
         return undefined
       }

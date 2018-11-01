@@ -2,6 +2,8 @@
   "scopeName": "source.crpl",
   "fileTypes": [".crpl"],
   "patterns": [{
+      "include": "#function"
+    }, {
       "include": "#language"
     }
   ],
@@ -9,7 +11,7 @@
     "function": {
       "name": "meta.func.crpl",
       "begin": "(?i)((:destroyed|:awake|:GameLoaded|:ShowMessageDialogCallback|:UserCancelAction)\\b|(:[A-Za-z]\\w*))",
-      "end": "(?=:[A-Za-z]\\w*)",
+      "end": "(?=:[A-Za-z])",
       "patterns": [{ "include": "#language" }],
       "beginCaptures": {
         "2": { "name": "entity.name.function.definition.event.crpl" },
@@ -97,7 +99,7 @@
         ]
       }, {
         "name": "variable.parameter.crpl",
-        "start": "\\$[A-Za-z]\\w*:[^\\s]"
+        "start": "\\$[A-Za-z]\\w*:"
       }, {
         "name": "entity.name.function.call.event.crpl",
         "match": "(?i)\\b(@destroyed|@awake|@GameLoaded|@ShowMessageDialogCallback|@UserCancelAction)\\b"

@@ -3,6 +3,4 @@ declare module 'decode-html' {
     export = placeholder
 }
 
-declare module 'crpl-docs.json' {
-    
-}
+declare module 'crpl-docs.json'

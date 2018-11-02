@@ -298,12 +298,12 @@ export function activate(context: vscode.ExtensionContext) {
       let richDoc = <RichDoc>documents.get(document.uri.toString())
       let { wordRange, word } = richDoc.getWord(position.with(undefined, position.character - 1))
       if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
-        let result = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
-        result.push(...completionFilter(crplData.completionList, word, '9'))
+        let longlist = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
+        longlist.push(...completionFilter(crplData.completionList, word, '9'))
         let dupelog: string[] = []
-        result.forEach( (c, i) => {
-          if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label) }
-          else { delete result[i] }
+        let result: vscode.CompletionItem[] = []
+        longlist.forEach( (c, i) => {
+          if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label); result.push(c) }
         })
         return result
       } else {

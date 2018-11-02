@@ -195,6 +195,11 @@ class RichDoc {
     let tokenMatch = wordRange && this.tokens.find(richToken => (<vscode.Range>wordRange).isEqual(richToken.range))
     return { wordRange, word, tokenMatch }
   }
+
+  diagnose(diagnostics: vscode.DiagnosticCollection) {
+    let result: vscode.Diagnostic[] = []
+    diagnostics.set(this.doc.uri, result)
+  }
 }
 
 function docuWikiDocToMD (crplHTML: string): string[] {
@@ -247,70 +252,75 @@ function completionFilter(completionList: string[], word: string, sortPrefix: st
   })
 }
 
-let documents: Map<string, RichDoc> = new Map
-
 export function activate(context: vscode.ExtensionContext) {
-
   const watcher = vscode.workspace.createFileSystemWatcher('.crpl')
-  const push: (sub: vscode.Disposable) => number = context.subscriptions.push.bind(context.subscriptions)
+  let documents: Map<string, RichDoc> = new Map
+  let diagnostics = vscode.languages.createDiagnosticCollection('crpl')
 
   vscode.workspace.textDocuments.forEach(doc => { if (vscode.languages.match(crplSelector, doc)) { 
-    documents.set(doc.uri.toString(), new RichDoc(doc))
+    let richDoc = new RichDoc(doc)
+    documents.set(doc.uri.toString(), richDoc)
+    richDoc.diagnose(diagnostics)
   }})
-  push(watcher.onDidCreate(uri => {
-    documents.set(uri.toString(), new RichDoc(uri))
-  }))
-  push(watcher.onDidChange(uri => {
-    (<RichDoc>documents.get(uri.toString())).tokenize()
-  }))
-  push(watcher.onDidDelete(uri => {
-    documents.delete(uri.toString())
-  }))
-  push(vscode.languages.registerHoverProvider(crplSelector, {
-    async provideHover (document, position, token) {
-      let richDoc = <RichDoc>documents.get(document.uri.toString())
-      let { wordRange, word, tokenMatch } = richDoc.getWord(position)
-      if (word) {
-        try {
-          if (tokenMatch && tokenMatch.id !== undefined && tokenMatch.wiki) {
-            if (tokenMatch.id.startsWith('const_')) {
-              return new vscode.Hover(`\`${tokenMatch.id.toUpperCase()}\`: ${(crplData.unitConstants as any)[tokenMatch.id]}`, wordRange)
+  
+  context.subscriptions.push(
+    watcher.onDidCreate(uri => {
+      documents.set(uri.toString(), new RichDoc(uri))
+    }),
+    watcher.onDidChange(uri => {
+      let doc = <RichDoc>documents.get(uri.toString())
+      doc.tokenize()
+      doc.diagnose(diagnostics)
+    }),
+    watcher.onDidDelete(uri => {
+      documents.delete(uri.toString())
+    }),
+    vscode.languages.registerHoverProvider(crplSelector, {
+      async provideHover (document, position, token) {
+        let richDoc = <RichDoc>documents.get(document.uri.toString())
+        let { wordRange, word, tokenMatch } = richDoc.getWord(position)
+        if (word) {
+          try {
+            if (tokenMatch && tokenMatch.id !== undefined && tokenMatch.wiki) {
+              if (tokenMatch.id.startsWith('const_')) {
+                return new vscode.Hover(`\`${tokenMatch.id.toUpperCase()}\`: ${(crplData.unitConstants as any)[tokenMatch.id]}`, wordRange)
+              }
+              let docs = await request(crplData.prefix + tokenMatch.id + crplData.suffix)
+              return new vscode.Hover(docuWikiDocToMD(docs), wordRange)
+            } else {
+              return undefined
             }
-            let docs = await request(crplData.prefix + tokenMatch.id + crplData.suffix)
-            return new vscode.Hover(docuWikiDocToMD(docs), wordRange)
-          } else {
-            return undefined
+          } catch(err) {
+            if (err === 400) {
+              return new vscode.Hover(`Unable to parse response from ${crplData.prefix + (<RichToken>tokenMatch).id + crplData.suffix}.`)
+            } else {
+              console.log(err)
+            }
           }
-        } catch(err) {
-          if (err === 400) {
-            return new vscode.Hover(`Unable to parse response from ${crplData.prefix + (<RichToken>tokenMatch).id + crplData.suffix}.`)
-          } else {
-            console.log(err)
-          }
+        } else {
+          return undefined
         }
-      } else {
-        return undefined
       }
-    }
-  }))
-  push(vscode.languages.registerCompletionItemProvider(crplSelector, {
-    async provideCompletionItems (document, position, token) {
-      let richDoc = <RichDoc>documents.get(document.uri.toString())
-      let { wordRange, word } = richDoc.getWord(position.with(undefined, position.character - 1))
-      if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
-        let longlist = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
-        longlist.push(...completionFilter(crplData.completionList, word, '9'))
-        let dupelog: string[] = []
-        let result: vscode.CompletionItem[] = []
-        longlist.forEach( (c, i) => {
-          if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label); result.push(c) }
-        })
-        return result
-      } else {
-        return undefined
+    }),
+    vscode.languages.registerCompletionItemProvider(crplSelector, {
+      async provideCompletionItems (document, position, token) {
+        let richDoc = <RichDoc>documents.get(document.uri.toString())
+        let { wordRange, word } = richDoc.getWord(position.with(undefined, position.character - 1))
+        if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
+          let longlist = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
+          longlist.push(...completionFilter(crplData.completionList, word, '9'))
+          let dupelog: string[] = []
+          let result: vscode.CompletionItem[] = []
+          longlist.forEach( (c, i) => {
+            if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label); result.push(c) }
+          })
+          return result
+        } else {
+          return undefined
+        }
       }
-    }
-  }))
+    })
+  )
 }
 
 export function deactivate() {

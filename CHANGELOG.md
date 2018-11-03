@@ -1,7 +1,9 @@
-# Change Log
-All notable changes to the "crpl-vscode" extension will be documented in this file.
+# Changelog
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+## Unreleased
+- Parse tree
 
-## [Unreleased]
-- Initial release
+## 0.1.0 Beta
+- Syntax highlighting
+- Wiki lookup
+- Autocompletion

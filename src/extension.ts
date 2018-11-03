@@ -54,11 +54,13 @@ enum ParseMode {
   normal, string, comment
 }
 
+let wom = (s: string) => ` without matching "${s}"`
 class RichDoc {
+  private static wom = wom
   static valuePattern = /"|-?\d+(\.\d*)?/
   static stackSpec = {
     up: ['(', 'define', ':', 'func', 'do', 'once', 'if', 'else', 'while', 'repeat'],
-    down: new Map<string,string|RegExp>([
+    down: new Map<string, string|RegExp>([
       [')', '('],
       ['define', 'start'], [':', 'define'], ['value', ':'],
       ['func', /^(func|start)$/],
@@ -69,18 +71,29 @@ class RichDoc {
       ['repeat', 'while'],
       ['endwhile', 'repeat']
     ]),
-    unmatched: new Map<string, string|undefined>([
-      [')', 'without matched "("'],
-      ['define', undefined],
-      [':', 'without preceding "$" variable'],
-      ['value', 'without preceding "$" variable'],
-      ['func', 'inside another block'],
-      ['loop', 'without matching "do"'],
-      ['endonce', 'without matching "once"'],
-      ['else', 'without matching "if"'],
-      ['endif', 'without matching "if"'],
-      ['repeat', 'without matching "while"'],
-      ['endwhile', 'without matching "while" or "repeat"']
+    unmatched: new Map<string, [string, 0|2]>([
+      // number represents where the start of the block is
+      // inside the ParseTree in relation to the error'd token
+      // 0 = same token, eg [once, [...]]
+      // 2 = different token, eg [if, [...], else [...]]
+      ['(', [')', 0]],
+      ['do', ['loop', 0]],
+      ['once', ['endonce', 0]], 
+      ['if', ['endif', 0]],
+      ['else', ['endif', 2]],
+      ['while', ['repeat', 0]],
+      ['repeat', ['endwhile', 2]]
+    ]),
+    unstarted: new Map<string, string>([
+      [')', wom('(')],
+      [':', ' without preceding "$" variable'], 
+      ['value', ' without preceding "$" variable'],
+      ['func', ': function definition inside another block'],
+      ['loop', wom('do')],
+      ['endonce', wom('once')],
+      ['if', wom('endif')], ['else', wom('if')], ['endif', wom('if')],
+      ['repeat', wom('while')],
+      ['endwhile', wom('while') + ' or "repeat"']
     ])
   }
   static startToken = <RichToken>{
@@ -94,8 +107,9 @@ class RichDoc {
   }
 
   doc: vscode.TextDocument
-  tokens: RichToken[] = []
-  tree: ParseTree = <ParseTree>[RichDoc.startToken]
+  tokens
+    : { flat: RichToken[], lines: RichToken[][], tree: ParseTree }
+    = { flat: [], lines: [], tree: <ParseTree>[RichDoc.startToken]}
   constructor(docref: vscode.TextDocument | vscode.Uri) {
     if ((<vscode.TextDocument>docref).getText) {
       this.doc = <vscode.TextDocument>docref
@@ -106,18 +120,26 @@ class RichDoc {
   }
 
   tokenize() {
-    this.tokens = []
-    this.tree = new ParseTree()
+    let tokens: RichToken[] = this.tokens.flat = []
+    let lines: RichToken[][] = this.tokens.lines = []
+    let tree: ParseTree = this.tokens.tree = new ParseTree()
 
     let spec = RichDoc.stackSpec
     let stack: RichToken[] = []
-    let branch = this.tree
+    let branch = tree
     let doc = this.doc
     let parametric = true
     let mode = ParseMode.normal
 
-    // Here, replace is used as "for each match, do..."
+    function addToken(rToken: RichToken, line: number) {
+      tokens.push(rToken)
+      branch.push(rToken)
+      lines[line].push(rToken)
+    }
+
     doc.getText().split('\n').forEach((text, line) => {
+      lines.push([])
+      // Here, replace is used as "for each match, do..."
       text.replace(tokenPattern, (token, offset) => {
         if (mode === ParseMode.normal) {
           let id: string|undefined
@@ -161,14 +183,14 @@ class RichDoc {
             }
           }
 
-          let richToken = <RichToken>{
+          let rToken = <RichToken>{
             token, id, error, wiki,
             range: new vscode.Range(
               line, offset,
               line, offset + token.length
             )
           }
-          
+
           // go shallower
           if (id && spec.down.get(id)) {
             let top = stack.pop()
@@ -178,51 +200,76 @@ class RichDoc {
             if (matches) {
               branch = branch.parent || branch
             } else {
-              let wrongness = spec.unmatched.get(id)
-              richToken.error = !!wrongness && `Unexpected token "${token}" ${wrongness}.`
+              let wrongness = spec.unstarted.get(id)
+              rToken.error = !!wrongness && `Unexpected token "${token}"${wrongness}.`
               if (top) { stack.push(top) }
             }
           }
-
-          branch.push(richToken)
-
+          addToken(rToken, line)
           // go deeper
           if (id && RichDoc.stackSpec.up.indexOf(id) > -1) {
-            stack.push(richToken)
+            stack.push(rToken)
             let newBranch = new ParseTree()
             branch.push(newBranch)
             branch = newBranch
           }
-          this.tokens.push(richToken)
         } else if (mode === ParseMode.string && token === '"') {
-          let richToken = <RichToken>{ 
+          let rToken = <RichToken>{ 
             token, range: new vscode.Range(
               line, offset,
               line, offset + token.length
             )
           }
-          branch.push(richToken)
-          this.tokens.push(richToken)
+          addToken(rToken, line)
           mode = ParseMode.normal
         }
         return ''
       })
       if (mode === ParseMode.comment) { mode = ParseMode.normal }
     })
+    stack.forEach(rToken => {
+      if (rToken.id === 'func') {
+        let wrongness = spec.unstarted.get(rToken.id)
+        rToken.error = !!wrongness && `Unexpected token "${rToken.token}"${wrongness}.`
+      }
+      if (rToken.error) { return }
+      rToken.parent = <ParseTree>rToken.parent
+      let [ match, startOffset ] = <[string, 0|2]>RichDoc.stackSpec.unmatched.get(<string>rToken.id)
+      let errorToken = <RichToken>rToken.parent[rToken.parent.indexOf(rToken) - startOffset]
+      if (errorToken.error) { return }
+      errorToken.error = `"${errorToken.id}"` + wom(match)
+    })
+    this.printTokens()
   }
 
   getWord(position: vscode.Position): WordInTheHand {
     let wordRange = this.doc.getWordRangeAtPosition(position, tokenPattern)
     let word = wordRange && this.doc.getText(wordRange)
-    let tokenMatch = wordRange && this.tokens.find(richToken => (<vscode.Range>wordRange).isEqual(richToken.range))
+    let tokenMatch = wordRange && this.tokens.flat.find(rToken => (<vscode.Range>wordRange).isEqual(rToken.range))
     return { wordRange, word, tokenMatch }
   }
 
   diagnose(diagnostics: vscode.DiagnosticCollection) {
-    let result = this.tokens
+    let result = this.tokens.flat
       .filter(t => t.error)
       .map(t => new vscode.Diagnostic(t.range, <string>t.error))
     diagnostics.set(this.doc.uri, result)
+  }
+
+  printTokens(f: ((t: RichToken) => any) = t => t.token) {
+    type StringBranch = StringTree | string
+    class StringTree extends Array<StringBranch> {}
+    function niceTree(branch: ParseBranch): StringBranch {
+      if (Array.isArray(branch)) {
+        return branch.map(niceTree)
+      } else {
+        return f(branch) ? f(branch).toString() : '???'
+      }
+    }
+    console.log({
+      lines: this.tokens.lines.map(line => line.map(rToken => rToken.token).join(', ')),
+      tree: this.tokens.tree.map(niceTree)
+    })
   }
 }
 
@@ -281,43 +328,30 @@ export function activate(context: vscode.ExtensionContext) {
   let documents: Map<string, RichDoc> = new Map
   let diagnostics = vscode.languages.createDiagnosticCollection('crpl')
 
-  vscode.workspace.textDocuments.forEach(doc => { if (vscode.languages.match(crplSelector, doc)) { 
-    let richDoc = new RichDoc(doc)
-    documents.set(doc.uri.toString(), richDoc)
-    richDoc.diagnose(diagnostics)
-  }})
+  function updateDoc (doc: vscode.TextDocument) {
+    if (vscode.languages.match(crplSelector, doc)) {
+      let rDoc = documents.get(doc.uri.toString())
+      if (!rDoc) {
+        rDoc = new RichDoc(doc)
+        documents.set(doc.uri.toString(), rDoc)
+      }
+      rDoc.tokenize()
+      rDoc.diagnose(diagnostics)
+    }
+  }
 
-  let selectDoc = (doc: vscode.TextDocument) => vscode.languages.match(crplSelector, doc)
+  vscode.workspace.textDocuments.forEach(updateDoc)
   context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument(doc => {
-      if (selectDoc(doc)) {
-        documents.set(doc.uri.toString(), new RichDoc(doc))
-      }
-    }),
-    vscode.workspace.onDidChangeTextDocument(docChange => {
-      let doc = docChange.document
-      if (selectDoc(doc)) {
-        let richDoc = documents.get(doc.uri.toString())
-        if (!richDoc) {
-          richDoc = new RichDoc(doc)
-          documents.set(doc.uri.toString(), richDoc)
-        }
-        richDoc.tokenize()
-        richDoc.diagnose(diagnostics)
-      }
-    }),
-    vscode.workspace.onDidCloseTextDocument(doc => { 
-      if (selectDoc(doc)) {
-        documents.delete(doc.uri.toString())
-      }
-    }),
+    vscode.workspace.onDidOpenTextDocument(updateDoc),
+    vscode.workspace.onDidChangeTextDocument(change => { updateDoc(change.document) }),
+    vscode.workspace.onDidCloseTextDocument(doc => documents.delete(doc.uri.toString())),
     vscode.languages.registerHoverProvider(crplSelector, {
       async provideHover (document, position, token) {
-        let richDoc = <RichDoc>documents.get(document.uri.toString())
-        let { wordRange, word, tokenMatch } = richDoc.getWord(position)
+        let rDoc = <RichDoc>documents.get(document.uri.toString())
+        let { wordRange, word, tokenMatch } = rDoc.getWord(position)
         if (word) {
           try {
-            if (tokenMatch && tokenMatch.id !== undefined && tokenMatch.wiki) {
+            if (tokenMatch && tokenMatch.wiki && !tokenMatch.error && tokenMatch.id !== undefined) {
               if (tokenMatch.id.startsWith('const_')) {
                 return new vscode.Hover(`\`${tokenMatch.id.toUpperCase()}\`: ${(crplData.unitConstants as any)[tokenMatch.id]}`, wordRange)
               }
@@ -340,10 +374,10 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.languages.registerCompletionItemProvider(crplSelector, {
       async provideCompletionItems (document, position, token) {
-        let richDoc = <RichDoc>documents.get(document.uri.toString())
-        let { wordRange, word } = richDoc.getWord(position.with(undefined, position.character - 1))
+        let rDoc = <RichDoc>documents.get(document.uri.toString())
+        let { wordRange, word } = rDoc.getWord(position.with(undefined, position.character - 1))
         if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
-          let longlist = completionFilter(richDoc.tokens.map(rt => rt.token), word, '0')
+          let longlist = completionFilter(rDoc.tokens.flat.map(rt => rt.token), word, '0')
           longlist.push(...completionFilter(crplData.completionList, word, '9'))
           let dupelog: string[] = []
           let result: vscode.CompletionItem[] = []

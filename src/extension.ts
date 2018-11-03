@@ -6,7 +6,7 @@ import crplData = require('./crpl-data.json')
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
 const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
-// note: this should be different from language-configuration.json.wordPattern except with the addition of |\S
+// note: this should be the same as language-configuration.json.wordPattern except with the addition of |\S
 const symbolPatterns = new Map([
   [/<-[A-Za-z]\w*\b/, 'read'],
   [/->[A-Za-z]\w*\b/, 'write'],

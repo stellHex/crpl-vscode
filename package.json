@@ -2,7 +2,7 @@
     "name": "crpl",
     "displayName": "CRPL Language Support",
     "description": "Syntax support for the scripting language from the game Creeper World 3",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "publisher": "knucracker-community",
     "repository": {
         "type" : "git",
@@ -36,7 +36,7 @@
             {
                 "language": "crpl",
                 "scopeName": "source.crpl",
-                "path": "./src/crpl.tmLanguage.json"
+                "path": "./crpl.tmLanguage.json"
             }
         ]
     },
@@ -53,13 +53,12 @@
         "vscode": "^1.1.21",
         "tslint": "^5.8.0",
         "@types/node": "^8.10.25",
-        "@types/mocha": "^2.2.42"
+        "@types/mocha": "^2.2.42",
+        "@types/request-promise": "^4.1.42"
     },
     "dependencies": {
-        "@types/request-promise": "^4.1.42",
         "decode-html": "^2.0.0",
         "request": "^2.88.0",
-        "request-promise": "^4.2.2",
-        "vscode-textmate": "^4.0.1"
+        "request-promise": "^4.2.2"
     }
 }

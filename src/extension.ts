@@ -62,7 +62,7 @@ class RichDoc {
     down: new Map<string, string|RegExp>([
       [')', '('],
       ['define', 'start'], [':', 'define'], ['value', ':'],
-      ['func', /^(func|start|top)$/],
+      ['func', /^(func|start|bottom)$/],
       ['loop', 'do'],
       ['endonce', 'once'],
       ['else', 'if'],
@@ -154,11 +154,11 @@ class RichDoc {
               } else if (stack.length === 1 && stack[0].id === 'define') {
                 wiki = false
                 if (token === ':') { id = ':' }
-                else { error = 'Expected ":".' } 
+                else { error = 'Expected ":".'; parametric = false } 
               } else if (stack.length === 1 && stack[0].id === ':') {
                 wiki = false
-                if (RichDoc.valuePattern.test(token)) { id = 'value' }
-                else { error = 'Expected numeric literal or string.'; wiki = false }
+                if (RichDoc.valuePattern.test(token)) { id = 'value'; wiki = false }
+                else { error = 'Expected numeric literal or string.'; parametric = false }
                 if (token === '"') { mode = ParseMode.string }
               } else {
                 parametric = false
@@ -196,7 +196,7 @@ class RichDoc {
           // go shallower
           if (id && spec.down.get(id)) {
             let top = stack.pop()
-            let topid = top ? top.id : parametric ? 'start' : 'top'
+            let topid = top ? top.id : parametric ? 'start' : 'bottom'
             let matcher = spec.down.get(id)
             let matches = matcher instanceof RegExp ? (<RegExp>matcher).test(<string>topid) : matcher === topid
             if (matches) {
@@ -232,7 +232,8 @@ class RichDoc {
     stack.forEach(rToken => {
       if (rToken.id === 'func') {
         let wrongness = spec.unstarted.get(rToken.id)
-        rToken.error = !!wrongness && `Unexpected token "${rToken.token}"${wrongness}.`
+        rToken.error = (stack.length > 1) && `Unexpected token "${rToken.token}"${wrongness}.`
+        return
       }
       if (rToken.error) { return }
       rToken.parent = <ParseTree>rToken.parent
@@ -241,7 +242,7 @@ class RichDoc {
       if (errorToken.error) { return }
       errorToken.error = `"${errorToken.id}"` + wom(match)
     })
-    this.printTokens()
+    // this.printTokens()
   } catch (err) { console.log(err); throw err }} 
 
   getWord(position: vscode.Position): WordInTheHand {

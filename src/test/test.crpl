@@ -1,4 +1,6 @@
 $pirameter:3.14
+$pairametric:"Two"
+
 if (TRUE)
     "Yes!" ->exclamation
     5 do
@@ -16,8 +18,6 @@ else
         endwhile
     endonce
 endif
-endif
-if
 
 :funca
 "blah"

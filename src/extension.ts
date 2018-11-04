@@ -63,7 +63,7 @@ class RichDoc {
     down: new Map<string, string|RegExp>([
       [')', '('],
       ['define', 'start'], [':', 'define'], ['value', ':'],
-      ['func', /^(func|start)$/],
+      ['func', /^(func|start|top)$/],
       ['loop', 'do'],
       ['endonce', 'once'],
       ['else', 'if'],
@@ -119,7 +119,7 @@ class RichDoc {
     this.tokenize()
   }
 
-  tokenize() {
+  tokenize() { try {
     let tokens: RichToken[] = this.tokens.flat = []
     let lines: RichToken[][] = this.tokens.lines = []
     let tree: ParseTree = this.tokens.tree = new ParseTree()
@@ -164,6 +164,9 @@ class RichDoc {
               } else {
                 parametric = false
               }
+              if (error) {
+                stack.pop()
+              }
             }
             let lowerToken = token.toLowerCase()
             if (!parametric) {
@@ -194,14 +197,14 @@ class RichDoc {
           // go shallower
           if (id && spec.down.get(id)) {
             let top = stack.pop()
-            let topid = top ? top.id : 'start'
+            let topid = top ? top.id : parametric ? 'start' : 'top'
             let matcher = spec.down.get(id)
             let matches = matcher instanceof RegExp ? (<RegExp>matcher).test(<string>topid) : matcher === topid
             if (matches) {
               branch = branch.parent || branch
             } else {
               let wrongness = spec.unstarted.get(id)
-              rToken.error = !!wrongness && `Unexpected token "${token}"${wrongness}.`
+              rToken.error = rToken.error || `Unexpected token "${token}"${wrongness}.`
               if (top) { stack.push(top) }
             }
           }
@@ -240,7 +243,7 @@ class RichDoc {
       errorToken.error = `"${errorToken.id}"` + wom(match)
     })
     this.printTokens()
-  }
+  } catch (err) { console.log(err); throw err }} 
 
   getWord(position: vscode.Position): WordInTheHand {
     let wordRange = this.doc.getWordRangeAtPosition(position, tokenPattern)
@@ -315,6 +318,7 @@ function completionFilter(completionList: string[], word: string, sortPrefix: st
 
   let niceWord = word.toLowerCase().replace(pattern, '')
   let result = completionList
+    .filter(s => s.startsWith(prefix))
     .map(s => s.replace(pattern, ''))
     .filter(completion => completion.toLowerCase().startsWith(niceWord))
     .map(s => prefix + s)

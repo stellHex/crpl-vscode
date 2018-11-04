@@ -56,7 +56,6 @@ enum ParseMode {
 
 let wom = (s: string) => ` without matching "${s}"`
 class RichDoc {
-  private static wom = wom
   static valuePattern = /"|-?\d+(\.\d*)?/
   static stackSpec = {
     up: ['(', 'define', ':', 'func', 'do', 'once', 'if', 'else', 'while', 'repeat'],

@@ -2,8 +2,12 @@
     "name": "crpl",
     "displayName": "CRPL Language Support",
     "description": "Syntax support for the scripting language from the game Creeper World 3",
-    "version": "0.0.1",
+    "version": "0.2.0",
     "publisher": "knucracker-community",
+    "repository": {
+        "type" : "git",
+        "url" : "https://github.com/stellHex/crpl-vscode.git"
+    },
     "engines": {
         "vscode": "^1.28.0"
     },

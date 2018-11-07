@@ -3,6 +3,7 @@ import * as vscode from 'vscode'
 import * as request from 'request-promise'
 import entityDecode = require('decode-html')
 import crplData = require('./crpl-data.json')
+import { RichToken, ParseTree, ParseBranch, ParseMode } from './parseHelpers'
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
 const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
@@ -22,64 +23,14 @@ const symbolPatterns = new Map([
 ])
 const prefixPatterns = [
   /^(<-|->|--|-\?|\$)(?=[A-Za-z])/,
-  /^(:|)(?=[A-Za-z])/
+  /^(:|@)(?=[A-Za-z])/
 ]
 const docPattern = /=====\s*(.*)\s*=====\s*(.*\s*)*?.*Arguments.*\^\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|(.*?)\|(.*\s*)*?===\s*Description.*\s*((.*\s*)*)/
-
-enum crplType {
-  b = 0b0001,
-  i = 0b0111,
-  f = 0b0101,
-  s = 0b0001,
-  l = 0b1001,
-  n = 0b0001,
-  o = 0b0000,
-}
-
-const sigSpec = {
-  convertible (t1: crplType, t2: crplType) { return (t1 & t2) === t2 },
-  inTypes: new Map([
-    ['b', crplType.b], ['i', crplType.i], ['f', crplType.f],
-    ['x', crplType.f], ['y', crplType.f], ['z', crplType.f],
-    ['s', crplType.s],
-    ['l', crplType.l],
-    ['n', crplType.n]
-  ]),
-  outTypes: new Map([
-    ['b', crplType.i], ['i', crplType.i], ['f', crplType.f],
-    ['x', crplType.i], ['y', crplType.i], ['z', crplType.f],
-    ['s', crplType.s],
-    ['l', crplType.l],
-    ['n', crplType.n]
-  ])
-}
-
-interface RichToken {
-  token: string
-  range: vscode.Range
-  id: string | undefined
-  error: string | false
-  wiki: boolean
-  parent: ParseTree | undefined
-}
 
 interface WordInTheHand {
   wordRange: vscode.Range | undefined,
   word: string | undefined,
   tokenMatch: RichToken | undefined
-}
-
-type ParseBranch = ParseTree | RichToken
-class ParseTree extends Array<ParseBranch> {
-  parent: ParseTree | undefined
-  push (...branches: ParseBranch[]) {
-    branches.forEach(branch => branch.parent = this)
-    return super.push(...branches)
-  }
-}
-
-enum ParseMode {
-  normal, string, comment
 }
 
 let wom = (s: string) => ` without matching "${s}"`
@@ -101,8 +52,8 @@ class RichDoc {
     unmatched: new Map<string, [string, 0|2]>([
       // number represents where the start of the block is
       // inside the ParseTree in relation to the error'd token
-      // 0 = same token, eg [once, [...]]
-      // 2 = different token, eg [if, [...], else [...]]
+      // 0 = same token, eg ["once", [...]] -> "once" errors, its block starts at itself
+      // 2 = different token, eg ["if", [...], "else", [...]] -> "else" errors, its block starts at "if"
       ['(', [')', 0]],
       ['do', ['loop', 0]],
       ['once', ['endonce', 0]], 
@@ -357,55 +308,6 @@ function completionFilter(completionList: string[], word: string, sortPrefix: st
     label: c,
     sortText: sortPrefix + c
   })
-}
-
-export async function scrapeSignatures(groupSize: number = 10) {
-  let groups: string[][] = []
-  let group: string[]
-
-  crplData.words.forEach((word, i) => {
-    if (!(i % groupSize)) { group = []; groups.push(group) }
-    group.push(word)
-  })
-  let result = []
-  for (let i = 0; i < groups.length; i++) {
-    console.log(i+1, '/', groups.length)
-    result.push(await Promise.all(groups[i].map(async word => {
-      type sigType = [(string|undefined)[], (string|undefined)[]]
-      let item: { [word:string]: 'ERROR' | sigType } = {}
-      try {
-        let docs = await request(crplData.prefix + word + crplData.suffix)
-
-        docs = docs.replace(/\r/g, '')
-        docs = (<RegExpExecArray>/=====(.*\n)*/.exec(docs))[0];
-        docs = docs.replace(/(===+\s*Examples|<\/textarea)(.*\n)*/, '');
-        docs = docs.replace(/''|%%/g, '`');
-        docs = entityDecode(docs)
-        let prepresig = /\| *`? *((?:[bifxysln]\d? *?)*) *-+ *((?:[bifxysln]\d? *?)*) *`? *\|$/i.exec(docs)
-        if (!prepresig) {
-          throw new Error(`Error getting signature from ${word}`)
-        }
-        let presig = (<(string|null|undefined)[]>prepresig).slice(1, 3)
-        let signature: sigType = [
-          presig[0] ? (<string>presig[0]).split(/ +/).map(t => t[0].toLowerCase()) : [],
-          presig[1] ? (<string>presig[1]).split(/ +/).map(t => t[0].toLowerCase()) : []
-        ]
-        item[word] = signature
-        return item
-      } catch (e) {
-        console.log(word, e)
-        item[word] = 'ERROR'
-        return item
-      }
-    })))
-  }
-
-  console.log(
-    JSON.stringify(result, null, ' ' )
-    .replace(/\n  ( +|(?=}))/g,'')
-    .replace( /\n [\[\]],?/g, '')
-    .replace(/},?\n  {/g, ',\n')
-  )
 }
 
 export function activate(context: vscode.ExtensionContext) {

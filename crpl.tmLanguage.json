@@ -108,7 +108,7 @@
         "match": "(?i)\\b(@destroyed|@awake|@GameLoaded|@ShowMessageDialogCallback|@UserCancelAction)\\b"
       }, {
         "name": "entity.name.function.call.user.crpl",
-        "match": "\\b@[A-Za-z]\\w*\\b"
+        "match": "@[A-Za-z]\\w*\\b"
       }, {
         "match": "(--\\?|<-!|->!|-\\?!)",
         "name:": "keyword.operator.variable.crpl"

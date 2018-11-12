@@ -5,8 +5,8 @@ import entityDecode = require('decode-html')
 import crplData = require('./crpl-data.json')
 import {
   RichToken, ParseTree, ParseBranch, ParseMode,
-  crplType, StackDelta, Stack,
-  scrapeSignatures, sigSpec} from './helpers'
+  CRPLType, StackDelta, Stack, StackTracker,
+  scrapeSignatures, sigSpec, signatures } from './helpers'
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
 const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
@@ -210,7 +210,6 @@ class RichDoc {
             branch.push(lastToken, newBranch)
             branch = newBranch
           }
-          if (parametric) { console.log(token, '[', exeStack.map(t => t.token).toString(), ']')}
           if (token === '"') {
             exeStack.pop()
             branch = branch.parent || branch

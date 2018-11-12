@@ -2,7 +2,39 @@ import { Range } from 'vscode'
 import * as request from 'request-promise'
 import entityDecode = require('decode-html')
 import crplData = require('./crpl-data.json')
-import { ParseTree } from './parseHelpers'
+
+export interface RichToken {
+  token: string
+  range: Range
+  id?: string
+  error: string | false
+  parent?: ParseTree
+  meta: TokenMeta
+}
+
+export function makeRichToken(token: string, error: string|false = false, id?: string ) {
+
+}
+
+export interface TokenMeta {
+  comment?: string
+  delta?: StackDelta
+  wiki: boolean
+}
+
+export type ParseBranch = ParseTree | RichToken
+export class ParseTree extends Array<ParseBranch> {
+  start?: RichToken
+  parent?: ParseTree
+  push (...branches: ParseBranch[]) {
+    branches.forEach(branch => branch.parent = this)
+    return super.push(...branches)
+  }
+}
+
+export enum ParseMode {
+  normal, string, comment
+}
 
 export enum crplType {
   b = 0b0001, // bool
@@ -14,16 +46,7 @@ export enum crplType {
   o = 0b0000, // bottom of stack
 }
 
-export interface StackToken {
-  token: string
-  range: Range
-  id: string | undefined
-  error: string | false
-  parent: ParseTree | undefined
-  delta: StackDelta
-}
-
-export const spec = {
+export const sigSpec = {
   convertible (t1: crplType, t2: crplType) { return (t1 & t2) === t2 },
   inTypes: new Map([
     ['b', crplType.b], ['i', crplType.i], ['f', crplType.f],
@@ -80,7 +103,7 @@ export class Stack extends Array<number> {
   patch (delta: StackDelta) {
     delta.input.reduceRight((prev, expected: crplType, i) => {
       let popped = <crplType>this.pop(expected)
-      if (!spec.convertible(popped, expected)) {
+      if (!sigSpec.convertible(popped, expected)) {
         throw { popped, place: i, expected }
       }
       return prev

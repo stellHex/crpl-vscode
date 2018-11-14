@@ -164,11 +164,11 @@ class RichDoc {
       }
     }
 
-    function checkWarp(warpToken: RichToken, line: number) {
+    function checkWarp(warpToken: RichToken, line: number) { // TODO
       if (warpToken.id === '(') {
         
       } else if (warpToken.id === ')') {
-        if (!warpStack.length) { return }
+
       }
     }
 
@@ -312,7 +312,7 @@ class RichDoc {
     })
     this.checkVariables()
     this.checkFunctions()
-    this.printTokens()
+    // this.printTokens()
   } catch (err) { console.log(err); throw err }}
 
   checkVariables() {
@@ -433,22 +433,17 @@ function docuWikiDocToMD (crplHTML: string): string[] {
   }
 }
 
-function completionFilter(completionList: string[], word: string, sortPrefix: string) {
-  let pattern: RegExp = /^/
-  prefixPatterns.forEach(p => {
-    if (p.test(word)) { pattern = p }
-  });
-  let prefix = (<RegExpExecArray>pattern.exec(word))[0]
+function completionFilter(completionList: string[], rToken: RichToken, pattern: RegExp, prefix: string) {
+  let word = rToken.token
 
   let niceWord = word.toLowerCase().replace(pattern, '')
   let result = completionList
-    .filter(s => s.startsWith(prefix))
+    .filter(s => pattern.test(s))
     .map(s => s.replace(pattern, ''))
     .filter(completion => completion.toLowerCase().startsWith(niceWord))
     .map(s => prefix + s)
   return result.map(c => <vscode.CompletionItem>{
-    label: c,
-    sortText: sortPrefix + c
+    label: c, range: rToken.range
   })
 }
 
@@ -474,6 +469,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidOpenTextDocument(updateDoc),
     vscode.workspace.onDidChangeTextDocument(change => { updateDoc(change.document) }),
     vscode.workspace.onDidCloseTextDocument(doc => documents.delete(doc.uri.toString())),
+
     vscode.languages.registerHoverProvider(crplSelector, {
       async provideHover (document, position, token) {
         let rDoc = <RichDoc>documents.get(document.uri.toString())
@@ -503,17 +499,23 @@ export function activate(context: vscode.ExtensionContext) {
       async provideCompletionItems (document, position, token) {
         let rDoc = <RichDoc>documents.get(document.uri.toString())
         let { wordRange, word, tokenMatch } = rDoc.getWord(position.with(undefined, position.character - 1))
-        if (word && (<vscode.Range>wordRange).end.isEqual(position)) {
+        if (word && tokenMatch && (<vscode.Range>wordRange).end.isEqual(position) ) {
+          let pattern: RegExp = /^/
+          prefixPatterns.forEach(p => {
+            if (p.test(<string>word)) { pattern = p }
+          });
+          let prefix = (<RegExpExecArray>pattern.exec(word))[0]
           let longlist = completionFilter(
             rDoc.tokens.flat.filter(rt => tokenMatch != rt).map(rt => rt.token),
-            word, '0'
+            tokenMatch, pattern, prefix
           )
-          longlist.push(...completionFilter(crplData.completionList, word, '9'))
+          longlist.push(...completionFilter(crplData.completionList, tokenMatch, pattern, prefix))
           let dupelog: string[] = []
           let result: vscode.CompletionItem[] = []
           longlist.forEach( (c, i) => {
             if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label); result.push(c) }
           })
+          console.log(result.map(c => c.label).toString())
           return result
         }
       }
@@ -535,7 +537,24 @@ export function activate(context: vscode.ExtensionContext) {
           }
         }
       }
-    })
+    }),
+    vscode.languages.registerReferenceProvider( crplSelector,  {
+      async provideReferences(document, position, token) {
+        let rDoc = <RichDoc>documents.get(document.uri.toString())
+        let { tokenMatch } = rDoc.getWord(position)
+        if (tokenMatch && (tokenMatch.meta.var)) {
+          let tracker = rDoc.getVar(tokenMatch.meta.var)
+          return [...tracker.define, ...tracker.write, ...tracker.read, ...tracker.delete, ...tracker.exists]
+            .map(rt => new vscode.Location(rDoc.doc.uri, rt.range))
+        } else if (tokenMatch && tokenMatch.meta.func){
+          let tracker = rDoc.getFunc(tokenMatch.meta.func)
+          return [...tracker.func, ...tracker.call]
+            .map(rt => new vscode.Location(rDoc.doc.uri, rt.range))
+        }
+      }
+    }),
+    // vscode.languages.registerRenameProvider,
+    // vscode.languages.registerReferenceProvider
   )
 }
 

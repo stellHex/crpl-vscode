@@ -6,7 +6,7 @@ import crplData = require('./crpl-data.json')
 import {
   RichToken, ParseTree, ParseBranch, ParseMode,
   CRPLType, StackDelta, Stack, StackTracker,
-  scrapeSignatures, sigSpec, signatures } from './helpers'
+  scrapeSignatures, sigSpec, signatures, ParseChunk } from './helpers'
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
 const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
@@ -93,17 +93,18 @@ class RichDoc {
       ['"', wom('"')]
     ])
   }
-  static startToken: RichToken = {
+  static startToken(): RichToken { return {
     token: '',
     range: <vscode.Range>{
       start: <vscode.Position>{line: 0, character: 0},
       end: <vscode.Position>{line: 0, character: 0}
     },
     meta: { wiki: false }
-  }
+  }}
 
   doc: vscode.TextDocument
   tokens: { flat: RichToken[], lines: RichToken[][], tree: ParseTree }
+  // tokens.flat and tokens.tree should be in warped order, tokens.lines can't be
   funcs = new Map<string, FuncTracker>()
   vars = new Map<string, VarTracker>()
   constructor(docref: vscode.TextDocument | vscode.Uri) {
@@ -112,20 +113,20 @@ class RichDoc {
     } else {
       this.doc = <vscode.TextDocument>vscode.workspace.textDocuments.find(doc => doc.uri === docref)
     }
-    this.tokens = { flat: [], lines: [], tree: new ParseTree([RichDoc.startToken]) }
+    this.tokens = { flat: [], lines: [], tree: new ParseTree([RichDoc.startToken()]) }
     this.tokenize()
   }
 
   tokenize() { try {
     let tokens: RichToken[] = this.tokens.flat = []
     let lines: RichToken[][] = this.tokens.lines = []
-    let tree: ParseTree = this.tokens.tree = new ParseTree()
+    let tree: ParseTree = this.tokens.tree = new ParseTree([RichDoc.startToken()])
     this.funcs = new Map()
     this.vars = new Map()
 
     let spec = RichDoc.stackSpec
     let exeStack: RichToken[] = []
-    let warpStack: RichToken[] = []
+    let warpStack: (ParseChunk|ParseChunk[])[] = []
     let branch = tree
     let doc = this.doc
     let parametric = true
@@ -146,6 +147,8 @@ class RichDoc {
         let matches = matcher instanceof RegExp ? (<RegExp>matcher).test(<string>topid) : matcher === topid
         if (matches) {
           branch = branch.parent || branch
+          rToken.meta.blockPredecessor = top
+          if (top) { top.meta.blockSuccessor = rToken }
         } else {
           let wrongness = spec.unstarted.get(id)
           rToken.error = rToken.error || `Unexpected token "${token}"${wrongness}.`
@@ -166,10 +169,55 @@ class RichDoc {
 
     function checkWarp(warpToken: RichToken, line: number) { // TODO
       if (warpToken.id === '(') {
-        
-      } else if (warpToken.id === ')') {
-
+        let wsMember: ParseChunk[] = []
+        warp()
+        function pop() { tokens.pop(); return branch.pop() }
+        function warp() {
+          if (branch.length) {
+            let prevToken = <RichToken>pop()
+            if (prevToken.id === 'endcomment') { // ignore comments
+              let body = <ParseTree>pop(), start = <RichToken>pop() 
+              wsMember.push([start, body, prevToken])
+              warp()
+            } else if (prevToken.id === '"') { // treat strings as a whole one thing
+              let body = <ParseTree>pop(), start = <RichToken>pop()
+              warpFin([start, body, prevToken])
+            } else {
+              warpFin(prevToken)
+            }
+          } else {
+            branch = branch.parent || branch
+            exeStack.pop()
+            pop()
+            warpFin(<RichToken>pop())
+          }
+        }
+        function warpFin(prev: ParseChunk) {
+          let realMember = wsMember.length ? wsMember : prev
+          wsMember.push(prev)
+          if (branch.parent === tree && (
+            branch[branch.length-1] && (<RichToken>branch[branch.length-1]).id === ':'
+            || prev === tree[0])
+          ) {
+            warpToken.error = '"(" can\'t go at the beginning of the file!'
+            unwarp(realMember)
+          } else {
+            warpStack.push(realMember)
+          }
+          return 
+        }
       }
+    }
+    function checkUnwarp(warpToken: RichToken, line: number) { // TODO
+      if (warpToken.id === ')') {
+        let toUnwarp = warpStack.pop()
+        if (Array.isArray(toUnwarp)) {
+
+        }
+      }
+    }
+    function unwarp(wsMember: ParseChunk|ParseChunk[]) { // TODO
+
     }
 
     function checkIJK(ijkToken: RichToken) {
@@ -261,10 +309,12 @@ class RichDoc {
 
           rToken.id = id; rToken.meta.wiki = wiki; rToken.error = error
 
+          checkWarp(rToken, line)
           checkUnnest(rToken)
           addToken(rToken, line)
-          checkWarp(rToken, line)
           checkNest(rToken)
+          checkUnwarp(rToken, line)
+
           checkIJK(rToken)
         } else if (mode === ParseMode.string) {
           if (parametric && exeStack.length === 0) {
@@ -280,18 +330,22 @@ class RichDoc {
           if (token === '"') {
             exeStack.pop()
             branch = branch.parent || branch
-            addToken(<RichToken>{ token, range, id: '"', meta: {} }, line)
+            addToken({ token, range, id: '"', meta: { wiki: false } }, line)
             mode = ParseMode.normal
           } else {
-            addToken(<RichToken>{ token, range, id: 'string', meta: {} }, line)
+            addToken({ token, range, id: 'string', meta: { wiki: false } }, line)
           }
         } else if (mode === ParseMode.comment) {
-          addToken(<RichToken>{ token, range, id: '#' + token, meta: {} }, line)
+          addToken({ token, range, id: '#' + token, meta: { wiki: false } }, line)
         }
         return ''
       })
       if (mode === ParseMode.comment) {
         exeStack.pop()
+        addToken({
+          token: '', id: 'endcomment', meta: { wiki: false },
+          range: new vscode.Range(line, text.length, line, text.length)
+        }, line)
         branch = branch.parent || branch
         mode = ParseMode.normal
       }
@@ -506,7 +560,7 @@ export function activate(context: vscode.ExtensionContext) {
           });
           let prefix = (<RegExpExecArray>pattern.exec(word))[0]
           let longlist = completionFilter(
-            rDoc.tokens.flat.filter(rt => tokenMatch != rt).map(rt => rt.token),
+            rDoc.tokens.flat.filter(rt => tokenMatch !== rt).map(rt => rt.token),
             tokenMatch, pattern, prefix
           )
           longlist.push(...completionFilter(crplData.completionList, tokenMatch, pattern, prefix))

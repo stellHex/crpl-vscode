@@ -19,8 +19,14 @@ export interface TokenMeta {
   comment?: string[]
   delta?: StackDelta
   wiki: boolean
+  blockPredecessor?: RichToken
+  blockSuccessor?: RichToken
 }
 
+export type ParseChunk = // TODO (maybe) convert main parser to be `ParseChunk[]`s instead of `[...ParseChunk]`s
+    [RichToken, ParseTree, RichToken, ParseTree, RichToken]
+  | [RichToken, ParseTree, RichToken]
+  | RichToken
 export type ParseBranch = ParseTree | RichToken
 export class ParseTree extends Array<ParseBranch> {
   start?: RichToken

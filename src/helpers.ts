@@ -7,13 +7,16 @@ export interface RichToken {
   token: string
   range: Range
   id?: string
-  error: string | false
+  error?: string
+  warning?: string
   parent?: ParseTree
   meta: TokenMeta
 }
 
 export interface TokenMeta {
-  comment?: string
+  var?: string
+  func?: string
+  comment?: string[]
   delta?: StackDelta
   wiki: boolean
 }
@@ -25,6 +28,10 @@ export class ParseTree extends Array<ParseBranch> {
   push (...branches: ParseBranch[]) {
     branches.forEach(branch => branch.parent = this)
     return super.push(...branches)
+  }
+  splice(start: number, deleteCount:number, ...items: ParseBranch[]) {
+    items.forEach(branch => branch.parent = this)
+    return super.splice(start, deleteCount, ...items)
   }
 }
 

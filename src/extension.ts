@@ -53,7 +53,7 @@ class RichDoc {
       ['endif', /^(if|else)$/],
       ['repeat', 'while'],
       ['endwhile', 'repeat'],
-      ['comment', 'endcomment'],
+      ['endcomment', 'comment'],
       ['"', '"']
     ]),
     unmatched: new Map<string, [string, 0|2]>([
@@ -68,7 +68,7 @@ class RichDoc {
       ['else', ['endif', 2]],
       ['while', ['repeat', 0]],
       ['repeat', ['endwhile', 2]],
-      ['endcomment', ['comment', 0]],
+      ['comment', ['endcomment', 0]],
       ['"', ['"', 0]]
     ]),
     unstarted: new Map<string, string>([

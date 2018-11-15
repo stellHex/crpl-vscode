@@ -5,7 +5,7 @@ import entityDecode = require('decode-html')
 import crplData = require('./crpl-data.json')
 import {
   RichToken, ParseTree, ParseBranch, ParseMode,
-  CRPLType, StackDelta, Stack, StackTracker,
+  CRPLType, StackDelta, Stack, StackTracker, VarTracker, FuncTracker,
   scrapeSignatures, sigSpec, signatures, ParseChunk } from './helpers'
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
@@ -34,15 +34,6 @@ interface WordInTheHand {
   wordRange?: vscode.Range,
   word?: string,
   tokenMatch?: RichToken
-}
-interface FuncTracker {
-  func: RichToken[]
-  call: RichToken[]
-}
-interface VarTracker {
-  read: RichToken[], write: RichToken[],
-  exists: RichToken[], delete: RichToken[],
-  define: RichToken[]
 }
 
 let wom = (s: string) => ` without matching "${s}"`
@@ -99,7 +90,7 @@ class RichDoc {
       start: <vscode.Position>{line: 0, character: 0},
       end: <vscode.Position>{line: 0, character: 0}
     },
-    meta: { wiki: false }
+    meta: { }
   }}
 
   doc: vscode.TextDocument
@@ -141,7 +132,7 @@ class RichDoc {
     function checkUnnest(rToken: RichToken) {
       let { id, token } = rToken
       if (id && spec.down.get(id) && id !== '"') {
-        let top = exeStack.pop()
+        let top = rToken.meta.blockPredecessor || exeStack.pop()
         let topid = top ? top.id : parametric ? 'start' : 'bottom'
         let matcher = spec.down.get(id)
         let matches = matcher instanceof RegExp ? (<RegExp>matcher).test(<string>topid) : matcher === topid
@@ -167,11 +158,19 @@ class RichDoc {
       }
     }
 
-    function checkWarp(warpToken: RichToken, line: number) { // TODO
+    function checkWarp(warpToken: RichToken) {
       if (warpToken.id === '(') {
         let wsMember: ParseChunk[] = []
         warp()
-        function pop() { tokens.pop(); return branch.pop() }
+        function pop() {
+          let result = branch.pop()
+          if (Array.isArray(result)) {
+            tokens.splice(tokens.lastIndexOf(<RichToken>(<ParseTree>result)[0]))
+          } else {
+            tokens.pop()
+          }
+          return result
+        }
         function warp() {
           if (branch.length) {
             let prevToken = <RichToken>pop()
@@ -179,45 +178,67 @@ class RichDoc {
               let body = <ParseTree>pop(), start = <RichToken>pop() 
               wsMember.push([start, body, prevToken])
               warp()
-            } else if (prevToken.id === '"') { // treat strings as a whole one thing
+            } else if (prevToken.id === '"') { // treat whole strings as one thing
               let body = <ParseTree>pop(), start = <RichToken>pop()
               warpFin([start, body, prevToken])
             } else {
+              if(Array.isArray(branch[branch.length-1])){
+                branch = <ParseTree>branch[branch.length-1]
+              }
               warpFin(prevToken)
             }
           } else {
             branch = branch.parent || branch
-            exeStack.pop()
-            pop()
             warpFin(<RichToken>pop())
           }
         }
         function warpFin(prev: ParseChunk) {
           let realMember = wsMember.length ? wsMember : prev
           wsMember.push(prev)
-          if (branch.parent === tree && (
-            branch[branch.length-1] && (<RichToken>branch[branch.length-1]).id === ':'
+          if (branch === tree && (
+            branch[branch.length-2] && (<RichToken>branch[branch.length-2]).id === ':'
             || prev === tree[0])
           ) {
-            warpToken.error = '"(" can\'t go at the beginning of the file!'
+            warpToken.error = 'Warp statements can\'t go at the beginning of the file!'
             unwarp(realMember)
           } else {
             warpStack.push(realMember)
           }
-          return 
         }
       }
     }
-    function checkUnwarp(warpToken: RichToken, line: number) { // TODO
+    function checkUnwarp(warpToken: RichToken) { // TODO
       if (warpToken.id === ')') {
-        let toUnwarp = warpStack.pop()
-        if (Array.isArray(toUnwarp)) {
-
+        if (warpStack.length) {
+          let toUnwarp = <ParseChunk|ParseChunk[]>warpStack.pop()
+          unwarp(toUnwarp)
+        } else {
+          warpToken.error = 'Warp statements can\'t go at the beginning of the file!'
         }
       }
     }
     function unwarp(wsMember: ParseChunk|ParseChunk[]) { // TODO
-
+      if (Array.isArray(wsMember)) {
+        if (wsMember[1] instanceof ParseTree) {
+          (<ParseBranch[]>wsMember).forEach(push)
+        } else {
+          while (wsMember.length) {
+            push(<ParseBranch>wsMember.pop())
+          }
+        }
+      } else {
+        checkUnnest(wsMember)
+        push(wsMember)
+        checkNest(wsMember)
+      }
+      function push (b: ParseBranch) { tokens.push(...flatten(b)); branch.push(b) }
+      function flatten(br: ParseBranch) {
+        if (Array.isArray(br)) {
+          let result: RichToken[] = []
+          br.forEach(b => result.push(...flatten(b)))
+          return result
+        } else { return [br] }
+      }
     }
 
     function checkIJK(ijkToken: RichToken) {
@@ -280,7 +301,7 @@ class RichDoc {
             }
             let lowerToken = token.toLowerCase()
             if (!parametric) {
-              if (token[0] === '$') { id = 'define'; error = `Input variables must go at the start of the file.` }
+              if (token[0] === '$') { id = 'define'; error = `Input variables must go at the beginning of the file.` }
               else if (token === '"') { mode = ParseMode.string; id = token; wiki = false }
               else if (token === '(' || token === ')') { id = token; wiki = false }
               else if (crplData.words.indexOf(lowerToken) > -1) { id = lowerToken }
@@ -309,11 +330,11 @@ class RichDoc {
 
           rToken.id = id; rToken.meta.wiki = wiki; rToken.error = error
 
-          checkWarp(rToken, line)
           checkUnnest(rToken)
+          checkWarp(rToken)
           addToken(rToken, line)
+          checkUnwarp(rToken)
           checkNest(rToken)
-          checkUnwarp(rToken, line)
 
           checkIJK(rToken)
         } else if (mode === ParseMode.string) {
@@ -330,20 +351,24 @@ class RichDoc {
           if (token === '"') {
             exeStack.pop()
             branch = branch.parent || branch
-            addToken({ token, range, id: '"', meta: { wiki: false } }, line)
+            addToken({ token, range, id: '"', meta: { } }, line)
             mode = ParseMode.normal
           } else {
-            addToken({ token, range, id: 'string', meta: { wiki: false } }, line)
+            addToken({ token, range, id: 'string', meta: { } }, line)
           }
         } else if (mode === ParseMode.comment) {
-          addToken({ token, range, id: '#' + token, meta: { wiki: false } }, line)
+          addToken({ token, range, id: '#' + token, meta: { } }, line)
         }
+      
+        console.log(token)
+        this.printTokens()
+
         return ''
       })
       if (mode === ParseMode.comment) {
         exeStack.pop()
         addToken({
-          token: '', id: 'endcomment', meta: { wiki: false },
+          token: '', id: 'endcomment', meta: { },
           range: new vscode.Range(line, text.length, line, text.length)
         }, line)
         branch = branch.parent || branch
@@ -366,7 +391,7 @@ class RichDoc {
     })
     this.checkVariables()
     this.checkFunctions()
-    // this.printTokens()
+    this.printTokens()
   } catch (err) { console.log(err); throw err }}
 
   checkVariables() {
@@ -462,7 +487,7 @@ function docuWikiDocToMD (crplHTML: string): string[] {
 
     let splitKey = `~~~ ${Math.random()} ~~~`
     let matchedResult = docPattern.exec(docu)
-    if (matchedResult === null) { throw 400 }
+    if (matchedResult === null) { throw new Error('400') }
     let [, id,, args, results, notation,, description] = matchedResult
     description = description.replace(/==+ *(.*?) *==+/g, `\n${splitKey}\n**$1**\n`)
       .replace(/\[\[.*\|(.*)\]\]/g, '$1')

@@ -18,9 +18,15 @@ export interface TokenMeta {
   func?: string
   comment?: string[]
   delta?: StackDelta
-  wiki: boolean
+  wiki?: boolean
+  blockPredecessor?: RichToken
+  blockSuccessor?: RichToken
 }
 
+export type ParseChunk = // TODO (maybe) convert main parser to be `ParseChunk[]`s instead of `[...ParseChunk]`s
+    [RichToken, ParseTree, RichToken, ParseTree, RichToken]
+  | [RichToken, ParseTree, RichToken]
+  | RichToken
 export type ParseBranch = ParseTree | RichToken
 export class ParseTree extends Array<ParseBranch> {
   start?: RichToken
@@ -88,6 +94,16 @@ export const sigSpec = {
     ['l*', CRPLType.ll],
     ['n*', CRPLType.nn], ['*', CRPLType.nn]
   ])
+}
+
+export interface FuncTracker {
+  func: RichToken[]
+  call: RichToken[]
+}
+export interface VarTracker {
+  read: RichToken[], write: RichToken[],
+  exists: RichToken[], delete: RichToken[],
+  define: RichToken[]
 }
 
 export class StackDelta {

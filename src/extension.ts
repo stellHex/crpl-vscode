@@ -5,8 +5,8 @@ import entityDecode = require('decode-html')
 import crplData = require('./crpl-data.json')
 import {
   RichToken, ParseTree, ParseBranch, ParseMode,
-  CRPLType, StackDelta, Stack, StackTracker,
-  scrapeSignatures, sigSpec, signatures } from './helpers'
+  CRPLType, StackDelta, Stack, StackTracker, VarTracker, FuncTracker,
+  scrapeSignatures, sigSpec, signatures, ParseChunk } from './helpers'
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
 const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
@@ -35,15 +35,6 @@ interface WordInTheHand {
   word?: string,
   tokenMatch?: RichToken
 }
-interface FuncTracker {
-  func: RichToken[]
-  call: RichToken[]
-}
-interface VarTracker {
-  read: RichToken[], write: RichToken[],
-  exists: RichToken[], delete: RichToken[],
-  define: RichToken[]
-}
 
 let wom = (s: string) => ` without matching "${s}"`
 class RichDoc {
@@ -62,7 +53,7 @@ class RichDoc {
       ['endif', /^(if|else)$/],
       ['repeat', 'while'],
       ['endwhile', 'repeat'],
-      ['comment', 'endcomment'],
+      ['endcomment', 'comment'],
       ['"', '"']
     ]),
     unmatched: new Map<string, [string, 0|2]>([
@@ -77,7 +68,7 @@ class RichDoc {
       ['else', ['endif', 2]],
       ['while', ['repeat', 0]],
       ['repeat', ['endwhile', 2]],
-      ['endcomment', ['comment', 0]],
+      ['comment', ['endcomment', 0]],
       ['"', ['"', 0]]
     ]),
     unstarted: new Map<string, string>([
@@ -93,17 +84,18 @@ class RichDoc {
       ['"', wom('"')]
     ])
   }
-  static startToken: RichToken = {
+  static startToken(): RichToken { return {
     token: '',
     range: <vscode.Range>{
       start: <vscode.Position>{line: 0, character: 0},
       end: <vscode.Position>{line: 0, character: 0}
     },
-    meta: { wiki: false }
-  }
+    meta: { }
+  }}
 
   doc: vscode.TextDocument
   tokens: { flat: RichToken[], lines: RichToken[][], tree: ParseTree }
+  // tokens.flat and tokens.tree should be in warped order, tokens.lines can't be
   funcs = new Map<string, FuncTracker>()
   vars = new Map<string, VarTracker>()
   constructor(docref: vscode.TextDocument | vscode.Uri) {
@@ -112,19 +104,20 @@ class RichDoc {
     } else {
       this.doc = <vscode.TextDocument>vscode.workspace.textDocuments.find(doc => doc.uri === docref)
     }
-    this.tokens = { flat: [], lines: [], tree: new ParseTree([RichDoc.startToken]) }
+    this.tokens = { flat: [], lines: [], tree: new ParseTree([RichDoc.startToken()]) }
     this.tokenize()
   }
 
   tokenize() { try {
     let tokens: RichToken[] = this.tokens.flat = []
     let lines: RichToken[][] = this.tokens.lines = []
-    let tree: ParseTree = this.tokens.tree = new ParseTree()
+    let tree: ParseTree = this.tokens.tree = new ParseTree([RichDoc.startToken()])
     this.funcs = new Map()
     this.vars = new Map()
 
     let spec = RichDoc.stackSpec
     let exeStack: RichToken[] = []
+    let warpStack: (ParseChunk|ParseChunk[])[] = []
     let branch = tree
     let doc = this.doc
     let parametric = true
@@ -139,12 +132,14 @@ class RichDoc {
     function checkUnnest(rToken: RichToken) {
       let { id, token } = rToken
       if (id && spec.down.get(id) && id !== '"') {
-        let top = exeStack.pop()
+        let top = rToken.meta.blockPredecessor || exeStack.pop()
         let topid = top ? top.id : parametric ? 'start' : 'bottom'
         let matcher = spec.down.get(id)
         let matches = matcher instanceof RegExp ? (<RegExp>matcher).test(<string>topid) : matcher === topid
         if (matches) {
           branch = branch.parent || branch
+          rToken.meta.blockPredecessor = top
+          if (top) { top.meta.blockSuccessor = rToken }
         } else {
           let wrongness = spec.unstarted.get(id)
           rToken.error = rToken.error || `Unexpected token "${token}"${wrongness}.`
@@ -160,6 +155,89 @@ class RichDoc {
         newBranch.start = rToken
         branch.push(newBranch)
         branch = newBranch
+      }
+    }
+
+    function checkWarp(warpToken: RichToken) {
+      if (warpToken.id === '(') {
+        let wsMember: ParseChunk[] = []
+        warp()
+        function pop() {
+          let result = branch.pop()
+          if (Array.isArray(result)) {
+            tokens.splice(tokens.lastIndexOf(<RichToken>(<ParseTree>result)[0]))
+          } else {
+            tokens.pop()
+          }
+          return result
+        }
+        function warp() {
+          if (branch.length) {
+            let prevToken = <RichToken>pop()
+            if (prevToken.id === 'endcomment') { // ignore comments
+              let body = <ParseTree>pop(), start = <RichToken>pop() 
+              wsMember.push([start, body, prevToken])
+              warp()
+            } else if (prevToken.id === '"') { // treat whole strings as one thing
+              let body = <ParseTree>pop(), start = <RichToken>pop()
+              warpFin([start, body, prevToken])
+            } else {
+              if(Array.isArray(branch[branch.length-1])){
+                branch = <ParseTree>branch[branch.length-1]
+              }
+              warpFin(prevToken)
+            }
+          } else {
+            branch = branch.parent || branch
+            warpFin(<RichToken>pop())
+          }
+        }
+        function warpFin(prev: ParseChunk) {
+          let realMember = wsMember.length ? wsMember : prev
+          wsMember.push(prev)
+          if (branch === tree && (
+            branch[branch.length-2] && (<RichToken>branch[branch.length-2]).id === ':'
+            || prev === tree[0])
+          ) {
+            warpToken.error = 'Warp statements can\'t go at the beginning of the file!'
+            unwarp(realMember)
+          } else {
+            warpStack.push(realMember)
+          }
+        }
+      }
+    }
+    function checkUnwarp(warpToken: RichToken) { // TODO
+      if (warpToken.id === ')') {
+        if (warpStack.length) {
+          let toUnwarp = <ParseChunk|ParseChunk[]>warpStack.pop()
+          unwarp(toUnwarp)
+        } else {
+          warpToken.error = 'Warp statements can\'t go at the beginning of the file!'
+        }
+      }
+    }
+    function unwarp(wsMember: ParseChunk|ParseChunk[]) { // TODO
+      if (Array.isArray(wsMember)) {
+        if (wsMember[1] instanceof ParseTree) {
+          (<ParseBranch[]>wsMember).forEach(push)
+        } else {
+          while (wsMember.length) {
+            push(<ParseBranch>wsMember.pop())
+          }
+        }
+      } else {
+        checkUnnest(wsMember)
+        push(wsMember)
+        checkNest(wsMember)
+      }
+      function push (b: ParseBranch) { tokens.push(...flatten(b)); branch.push(b) }
+      function flatten(br: ParseBranch) {
+        if (Array.isArray(br)) {
+          let result: RichToken[] = []
+          br.forEach(b => result.push(...flatten(b)))
+          return result
+        } else { return [br] }
       }
     }
 
@@ -223,7 +301,7 @@ class RichDoc {
             }
             let lowerToken = token.toLowerCase()
             if (!parametric) {
-              if (token[0] === '$') { id = 'define'; error = `Input variables must go at the start of the file.` }
+              if (token[0] === '$') { id = 'define'; error = `Input variables must go at the beginning of the file.` }
               else if (token === '"') { mode = ParseMode.string; id = token; wiki = false }
               else if (token === '(' || token === ')') { id = token; wiki = false }
               else if (crplData.words.indexOf(lowerToken) > -1) { id = lowerToken }
@@ -253,8 +331,11 @@ class RichDoc {
           rToken.id = id; rToken.meta.wiki = wiki; rToken.error = error
 
           checkUnnest(rToken)
+          checkWarp(rToken)
           addToken(rToken, line)
+          checkUnwarp(rToken)
           checkNest(rToken)
+
           checkIJK(rToken)
         } else if (mode === ParseMode.string) {
           if (parametric && exeStack.length === 0) {
@@ -270,18 +351,26 @@ class RichDoc {
           if (token === '"') {
             exeStack.pop()
             branch = branch.parent || branch
-            addToken(<RichToken>{ token, range, id: '"', meta: {} }, line)
+            addToken({ token, range, id: '"', meta: { } }, line)
             mode = ParseMode.normal
           } else {
-            addToken(<RichToken>{ token, range, id: 'string', meta: {} }, line)
+            addToken({ token, range, id: 'string', meta: { } }, line)
           }
         } else if (mode === ParseMode.comment) {
-          addToken(<RichToken>{ token, range, id: '#' + token, meta: {} }, line)
+          addToken({ token, range, id: '#' + token, meta: { } }, line)
         }
+      
+        console.log(token)
+        this.printTokens()
+
         return ''
       })
       if (mode === ParseMode.comment) {
         exeStack.pop()
+        addToken({
+          token: '', id: 'endcomment', meta: { },
+          range: new vscode.Range(line, text.length, line, text.length)
+        }, line)
         branch = branch.parent || branch
         mode = ParseMode.normal
       }
@@ -302,7 +391,7 @@ class RichDoc {
     })
     this.checkVariables()
     this.checkFunctions()
-    // this.printTokens()
+    this.printTokens()
   } catch (err) { console.log(err); throw err }}
 
   checkVariables() {
@@ -398,7 +487,7 @@ function docuWikiDocToMD (crplHTML: string): string[] {
 
     let splitKey = `~~~ ${Math.random()} ~~~`
     let matchedResult = docPattern.exec(docu)
-    if (matchedResult === null) { throw 400 }
+    if (matchedResult === null) { throw new Error('400') }
     let [, id,, args, results, notation,, description] = matchedResult
     description = description.replace(/==+ *(.*?) *==+/g, `\n${splitKey}\n**$1**\n`)
       .replace(/\[\[.*\|(.*)\]\]/g, '$1')
@@ -496,7 +585,7 @@ export function activate(context: vscode.ExtensionContext) {
           });
           let prefix = (<RegExpExecArray>pattern.exec(word))[0]
           let longlist = completionFilter(
-            rDoc.tokens.flat.filter(rt => tokenMatch != rt).map(rt => rt.token),
+            rDoc.tokens.flat.filter(rt => tokenMatch !== rt).map(rt => rt.token),
             tokenMatch, pattern, prefix
           )
           longlist.push(...completionFilter(crplData.completionList, tokenMatch, pattern, prefix))

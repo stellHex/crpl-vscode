@@ -17,7 +17,7 @@ else
             1 sub CONST_HEALTH SetUnitAttribute
         endwhile
     endonce
-endif
+endif ("Maybe." ->exclamation)
 
 :funca
 "blah"

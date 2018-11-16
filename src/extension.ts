@@ -125,7 +125,6 @@ class RichDoc {
 
     let spec = RichDoc.stackSpec
     let exeStack: RichToken[] = []
-    let warpStack: RichToken[] = []
     let branch = tree
     let doc = this.doc
     let parametric = true
@@ -161,14 +160,6 @@ class RichDoc {
         newBranch.start = rToken
         branch.push(newBranch)
         branch = newBranch
-      }
-    }
-
-    function checkWarp(warpToken: RichToken, line: number) { // TODO
-      if (warpToken.id === '(') {
-        
-      } else if (warpToken.id === ')') {
-
       }
     }
 
@@ -263,7 +254,6 @@ class RichDoc {
 
           checkUnnest(rToken)
           addToken(rToken, line)
-          checkWarp(rToken, line)
           checkNest(rToken)
           checkIJK(rToken)
         } else if (mode === ParseMode.string) {
@@ -515,7 +505,6 @@ export function activate(context: vscode.ExtensionContext) {
           longlist.forEach( (c, i) => {
             if (dupelog.indexOf(c.label) === -1) { dupelog.push(c.label); result.push(c) }
           })
-          console.log(result.map(c => c.label).toString())
           return result
         }
       }
@@ -538,7 +527,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     }),
-    vscode.languages.registerReferenceProvider( crplSelector,  {
+    vscode.languages.registerReferenceProvider(crplSelector,  {
       async provideReferences(document, position, token) {
         let rDoc = <RichDoc>documents.get(document.uri.toString())
         let { tokenMatch } = rDoc.getWord(position)
@@ -553,8 +542,37 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     }),
-    // vscode.languages.registerRenameProvider,
-    // vscode.languages.registerReferenceProvider
+    vscode.languages.registerRenameProvider(crplSelector, {
+      async prepareRename(document, position, token) {
+        let rDoc = <RichDoc>documents.get(document.uri.toString())
+        let { tokenMatch } = rDoc.getWord(position)
+        let name = tokenMatch && (tokenMatch.meta.var || tokenMatch.meta.func)
+        if (name) {
+          return {
+            range: (<RichToken>tokenMatch).range,
+            placeholder: name
+          }
+        }
+      },
+      async provideRenameEdits(document, position, newName, token) {
+        let rDoc = <RichDoc>documents.get(document.uri.toString())
+        let { tokenMatch } = rDoc.getWord(position)
+        let edit = new vscode.WorkspaceEdit()
+        if (tokenMatch && tokenMatch.meta.var) {
+          let name = tokenMatch.meta.var
+          let tracker = rDoc.getVar(name);
+          [...tracker.define, ...tracker.write, ...tracker.read, ...tracker.delete, ...tracker.exists]
+            .forEach(rt => edit.replace(rDoc.doc.uri, rt.range, rt.token.replace(name, newName)))
+          return edit
+        } else if (tokenMatch && tokenMatch.meta.func){
+          let name = tokenMatch.meta.func
+          let tracker = rDoc.getFunc(name);
+          [...tracker.func, ...tracker.call]
+            .forEach(rt => edit.replace(rDoc.doc.uri, rt.range, rt.token.replace(name, newName)))
+          return edit
+        }
+      }
+    }),
   )
 }
 

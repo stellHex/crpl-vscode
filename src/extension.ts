@@ -5,8 +5,8 @@ import entityDecode = require('decode-html')
 import crplData = require('./crpl-data.json')
 import {
   RichToken, ParseTree, ParseBranch, ParseMode,
-  CRPLType, StackDelta, Stack, StackTracker, VarTracker, FuncTracker,
-  scrapeSignatures, sigSpec, signatures, ParseChunk } from './helpers'
+  VarTracker, FuncTracker,
+  scrapeSignatures, ParseChunk } from './helpers'
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
 const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
@@ -207,7 +207,7 @@ class RichDoc {
         }
       }
     }
-    function checkUnwarp(warpToken: RichToken) { // TODO
+    function checkUnwarp(warpToken: RichToken) {
       if (warpToken.id === ')') {
         if (warpStack.length) {
           let toUnwarp = <ParseChunk|ParseChunk[]>warpStack.pop()
@@ -217,13 +217,13 @@ class RichDoc {
         }
       }
     }
-    function unwarp(wsMember: ParseChunk|ParseChunk[]) { // TODO
+    function unwarp(wsMember: ParseChunk|ParseChunk[]) {
       if (Array.isArray(wsMember)) {
         if (wsMember[1] instanceof ParseTree) {
           (<ParseBranch[]>wsMember).forEach(push)
         } else {
           while (wsMember.length) {
-            push(<ParseBranch>wsMember.pop())
+            unwarp(<ParseChunk|ParseChunk[]>wsMember.pop())
           }
         }
       } else {
@@ -367,11 +367,11 @@ class RichDoc {
       })
       if (mode === ParseMode.comment) {
         exeStack.pop()
+        branch = branch.parent || branch
         addToken({
           token: '', id: 'endcomment', meta: { },
           range: new vscode.Range(line, text.length, line, text.length)
         }, line)
-        branch = branch.parent || branch
         mode = ParseMode.normal
       }
     })
@@ -392,7 +392,7 @@ class RichDoc {
     this.checkVariables()
     this.checkFunctions()
     this.printTokens()
-  } catch (err) { console.log(err); throw err }}
+  } catch (err) { console.error(err); throw err }}
 
   checkVariables() {
     this.vars.forEach((tracker, name) => {
@@ -459,14 +459,14 @@ class RichDoc {
     diagnostics.set(this.doc.uri, result)
   }
 
-  printTokens(f: ((t: RichToken) => any) = t => t.token) {
+  printTokens(f: ((t: RichToken) => any) = t => t.token || (t.id ? `<${t.id}>` : t)) {
     type StringBranch = StringTree | string
     class StringTree extends Array<StringBranch> {}
     function niceTree(branch: ParseBranch): StringBranch {
       if (Array.isArray(branch)) {
         return branch.map(niceTree)
       } else {
-        return f(branch) ? f(branch).toString() : '???'
+        return f(branch) ? f(branch).toString() : branch
       }
     }
     console.log({

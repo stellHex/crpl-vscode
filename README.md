@@ -8,6 +8,7 @@ This extension adds syntax for the [Creeper Reverse Polish Language](https://knu
 
 - Syntax highlighting and diagnostics
 - Wiki lookup on hover
+- Variable tracking ("Find All References" and the like)
 - Autocompletion
 
 ### Planned
@@ -15,7 +16,7 @@ This extension adds syntax for the [Creeper Reverse Polish Language](https://knu
 Various more advanced linting features are planned, including
 
 - Checking arity and type of operation arguments
-- Variable tracking (eg scope monitoring, "Find All References")
+- Advanced variable tracking (scope monitoring)
 - Linting comments (eg `# lint disable`, `# lint stackAssert * n n l`)
 
 ## Extension Settings
@@ -24,4 +25,4 @@ None yet, although the more semantic linting diagnostics which are planned will 
 
 ## Known Issues
 
-The parser/linter is still a little suspect. If you find any issues, please send the dev a copy of the .crpl file you are working on.
+- The parser/linter is still a little suspect. If you find any issues, please send the dev a copy of the .crpl file you are working on.

@@ -42,6 +42,7 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
+        "pack": "vsce package",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "tscversion": "tsc -v",

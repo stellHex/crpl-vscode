@@ -361,7 +361,7 @@ class RichDoc {
         }
       
         console.log(token)
-        this.printTokens()
+        // this.printTokens()
 
         return ''
       })
@@ -391,7 +391,7 @@ class RichDoc {
     })
     this.checkVariables()
     this.checkFunctions()
-    this.printTokens()
+    // this.printTokens()
   } catch (err) { console.error(err); throw err }}
 
   checkVariables() {

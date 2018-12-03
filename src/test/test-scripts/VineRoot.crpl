@@ -1,0 +1,77 @@
+# VineRoot.crpl
+# Created on: 8/2/2018 7:06:31 PM
+# To use: add VineRoot.crpl a crpl core
+# ------------------------------------------
+
+$GrowIntervalSeconds:2.0
+
+$TargetCommandNode:1 # (Boolean)
+
+$TargetX:-1
+$TargetY:-1
+
+$TargetUnitChance:0.05
+# 0 = never, 1 = always
+# Chance to start targeting a nearby unit until it dies or leaves range
+$TargetUnitRadius:5
+$TargetCannons:0 # (Boolean)
+
+# Behavior:
+# If TargetId exists and is within TargetUnitRadius, go towards it
+# Else if TargetCommandNode and command node exists, go towards it
+# Else if TargetX,TargetY on map, go toward it
+# Else go toward random low-creeper area
+#
+# TargetUnitChance can trigger on any option except the first
+
+$SplitChance:0
+# 0 = never, 1 = always
+# Probably a bad idea to set to more than like 0.05
+
+#
+#ShowTraceLog ClearTraceLog
+#1 SetPopupTextAlwaysVisible ShowTraceLog
+#GetMouseCell 3 @towardcoord TraceStack " " swap concat concat SetPopupText
+#HideTraceLog
+
+once
+	-1 ->TargetId
+	<-GrowIntervalSeconds 30 mul asint ->GrowInterval
+endonce
+
+if (@HeadCheck GetGameTimeFrames <-GrowInterval @interval and)
+	@CreateVine
+else
+	<-Next @Connectify
+endif
+
+self @Connectify
+
+:HeadCheck
+	<-Next @exists not
+
+:CreateVine
+	"CRPLCORE" CurrentCoords CreateUnit ->Next
+	<-Next "Vine.crpl" AddScriptToUnit
+	<-Next "Vine.crpl" "Root" Self SetScriptVar
+	<-Next "Vine.crpl" "Prev" Self SetScriptVar
+
+:Connectify
+	dup @exists
+	if (not) pop return endif
+	dup	"Vine.crpl" "Connected" 1 SetScriptVar
+	dup	"Vine.crpl" "Next" GetScriptVar ->node
+	@forin(<-node) do
+		<-node @el @Connectify
+	loop
+
+:forin
+	GetListCount 0
+:el
+	I GetListElement
+:interval
+	mod 0 eq
+:exists
+	dup 0 gte
+	swap CONST_ISDESTROYED GetUnitAttribute not
+	and

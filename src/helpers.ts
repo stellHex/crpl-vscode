@@ -7,20 +7,21 @@ export interface RichToken {
   token: string
   range: Range
   id?: string
-  error?: string
-  warning?: string
+  error?: { message: string, code: string }
+  warning?: { message: string, code: string }
   parent?: ParseTree
   meta: TokenMeta
 }
 
 export interface TokenMeta {
-  var?: string
-  func?: string
-  comment?: string[]
-  delta?: StackDelta
-  wiki?: boolean
-  blockPredecessor?: RichToken
-  blockSuccessor?: RichToken
+  var?: string       // name of referenced variable
+  func?: string      // name of defined or called function
+  comment?: string[] // documentation for function defs
+  delta?: StackDelta // stack and type validation
+  wiki?: boolean     // whether to look it up if hovered over
+  blockPredecessor?: RichToken // eg "if" or "else" for "endif"
+  blockSuccessor?: RichToken   // eg "else" or "endif" for "if"
+  suppressErrors?: boolean     // whether the erors and warnings have been suppressed via lint disable
 }
 
 export type ParseChunk = // TODO (maybe) convert main parser to be `ParseChunk[]`s instead of `[...ParseChunk]`s
@@ -103,7 +104,7 @@ export interface FuncTracker {
 export interface VarTracker {
   read: RichToken[], write: RichToken[],
   exists: RichToken[], delete: RichToken[],
-  define: RichToken[]
+  define: RichToken[], declare: RichToken[]
 }
 
 export class StackDelta {
@@ -259,3 +260,5 @@ export async function scrapeSignatures(groupSize: number = 10) {
     .replace(/},?\n  {/g, ',\n')
   )
 }
+
+export function surely<T>(x: T) { return <Exclude<T, undefined|null>>x }

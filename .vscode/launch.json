@@ -12,7 +12,8 @@
             "runtimeExecutable": "${execPath}",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
-                "${workspaceFolder}/src/test/test.crpl"
+                "${workspaceFolder}/src/test/test-scripts",
+                "${workspaceFolder}/src/test/test-scripts/Vine.crpl"
             ],
             "outFiles": [
                 "${workspaceFolder}/out/**/*.js"

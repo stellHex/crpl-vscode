@@ -1,0 +1,240 @@
+# Vine.crpl
+# Created on: 8/2/2018 7:06:55 PM
+# To use: add VineRoot.crpl a crpl core
+# ------------------------------------------
+
+# Starts with var ->Root
+# Starts with var ->Prev
+# HideTraceLog
+# ShowTraceLog #ClearTraceLog
+# 1 SetPopupTextAlwaysVisible
+# <-TargetX <-TargetY @cat Self @cat
+# GetMouseCell @towardcoord TraceStack @cat
+# Self CONST_HEALTH GetUnitAttribute
+# <-Digitalist "
+# " <-NewDigitalist Concat Concat
+# <-Root <-GrowInterval @cat 
+# SetPopupText
+
+once
+	if (-?Next not) CreateList ->Next endif
+	# this if only necessary for reloading scripts
+	0 ->WasHead
+	1 ->GrowTimer
+	1 ->Connected
+	Self CONST_CELLHEIGHT 1 SetUnitAttribute
+	Self CONST_CELLWIDTH 1 SetUnitAttribute
+	0.05 ->DamageMultiplier
+	5 CreateListStartingSize ->Digitalist
+	5 CreateListStartingSize ->NewDigitalist
+
+	Self CONST_NULLIFIERDAMAGES 0 SetUnitAttribute
+	Self CONST_CREATEPZ 0 SetUnitAttribute
+	Self CONST_HEALRATE 0.005 SetUnitAttribute
+
+	CreateList ->Cells
+	0 1 1 0 0 -1 -1 0 0 0
+	5 0 do
+		CreateList ->coords
+		CurrentX add
+		<-coords swap AppendToList
+		CurrentY add
+		<-coords swap AppendToList
+		<-Cells <-coords AppendToList
+	loop
+
+	ClearStack
+	"GrowInterval"
+	"TargetCommandNode" "TargetId" "TargetX" "TargetY"
+	"TargetUnitChance" "TargetUnitRadius" "TargetCannons"
+	"SplitChance"
+	do (StackSize 0)
+		->var
+		<-Root "VineRoot.crpl" <-var GetScriptVar
+		<-var ->!
+	loop
+endonce
+
+
+if (Self @IsConnected)
+	Self CONST_SHOWHEALTHBAR false SetUnitAttribute
+	@CreateDigitalisGrowth
+	<-NewDigitalist @ListDigitalis
+	if (<-WasHead not)
+		@CompareDigitalis
+	endif
+	if (@HeadCheck)
+		<-GrowTimer 1 add ->GrowTimer
+		if (<-GrowTimer <-GrowInterval mod 0 eq)
+			@Grow
+			1 ->WasHead
+		endif
+	else
+		0 ->WasHead
+		1 ->GrowTimer
+	endif
+	@CreateDigitalis
+	<-Digitalist @ListDigitalis
+	0 ->Connected
+else
+	Self 0 Destroy
+endif
+
+
+
+# === METHODS ===
+# They do big things
+
+:CreateDigitalisGrowth
+	@forin (<-Cells) do
+		@cell @xy 1 SetDigitalisGrowth
+	loop
+:CreateDigitalis
+	@forin (<-Cells) do
+		@cell @xy
+		@cell @xy GetDigitalis 0.1 max
+		SetDigitalis
+	loop
+	CurrentCoords 1 SetDigitalis
+:IsConnected
+	<-Root @exists <-Connected and
+:ListDigitalis
+	->list
+	@forin (<-Cells) do
+		<-list I
+		@cell @xy GetDigitalis
+		SetListElement
+	loop
+
+:CompareDigitalis
+	0
+	@forin (<-Cells) do
+		<-Digitalist @el
+		<-NewDigitalist @el
+		sub dup
+		if (0 gt)
+			add
+		else
+			pop
+		endif
+	loop
+	@damageCalc
+	Self swap Damage
+
+# If TargetId exists and is within TargetUnitRadius, go towards it
+# Else if TargetCommandNode and command node exists, go towards it
+# Else if TargetX,TargetY on map, go toward it
+# Else go toward random low-creeper area
+#
+# TargetUnitChance can trigger on any option except the first
+:Grow
+	if (<-TargetId @exists)
+		<-TargetId @unitxy <-CurrentCoords Distance
+		if (lte) <-TargetId @unitxy @towardcoord @CreateVine return
+		else -1 ->TargetId
+	endif endif
+	if (<-TargetCommandNode GetCommandNodeCount and)
+		1 ->notfound
+		CurrentCoords 10000 GetUnitsInRange
+		0 do
+			if (<-notfound)
+				dup GetUnitType "COMMANDNODE"
+				if (eq)
+					@unitxy @towardcoord @CreateVine
+					0 ->notfound
+				else pop endif
+			else pop endif
+		loop
+	return endif
+	if (0 <-TargetX MapWidth @inrange 0 <-TargetY MapHeight @inrange and not)
+		2000 ->mincreep
+		0 ->maxdistance
+		20 0 do
+			RandCoords ->y ->x
+			while <-x <-y GetVoid repeat 
+				RandCoords ->y ->x
+			endwhile
+			<-x <-y GetCreeper 0 max ->creep
+			@rootCoords <-x <-y Distance ->d
+			if (<-creep <-mincreep lt
+				<-creep <-mincreep eq <-d <-maxdistance gt and or)
+				<-x ->TargetX 
+				<-y ->TargetY
+				<-creep ->mincreep
+				<-d ->maxdistance
+			endif
+		loop
+	endif
+	<-TargetX <-TargetY @towardcoord @CreateVine
+
+:CreateVine
+	->y ->x# <-x <-y @cat SetPopupText
+	if (<-x CurrentX eq <-y CurrentY eq and) return endif
+	if (<-x <-y GetDigitalis 0 gt) return endif
+	"CRPLCORE" <-x <-y CreateUnit ->new
+	<-new "Vine.crpl" AddScriptToUnit
+	<-new "Vine.crpl" "Root" <-Root SetScriptVar
+	<-new "Vine.crpl" "Prev" Self SetScriptVar
+	<-Root "VineRoot.crpl" "TargetX" <-TargetX SetScriptVar
+	<-Root "VineRoot.crpl" "TargetY" <-TargetY SetScriptVar
+	<-new "Vine.crpl" "TargetId" <-TargetId SetScriptVar
+	<-Next <-new AppendToList
+
+:HeadCheck
+	0
+	@forin (<-Next) do
+		<-Next @el @exists or
+	loop
+	not
+
+:destroyed
+	"CRPLCORE" CurrentCoords CreateUnit ->deadself
+	<-deadself "VineDying.crpl" AddScriptToUnit
+	<-deadself "VineDying.crpl" "Cells" <-Cells SetScriptVar
+
+# === UTILITIES ===
+# They do small things
+
+:rootCoords
+	<-Root CONST_COORDX GetUnitAttribute
+	<-Root CONST_COORDY GetUnitAttribute
+:cell
+	<-Cells @el
+:damageCalc #may become more complex in the future
+	<-DamageMultiplier mul
+:towardcoord
+	CurrentY sub swap
+	CurrentX sub
+	atan2
+		RandFloat RandFloat sub add
+		RandFloat RandFloat sub add
+		RandFloat RandFloat sub add
+	PI 0.25 mul div
+	0.5 add
+	0 round
+	0.5 sub
+	PI 0.25 mul mul
+	dup cos 2 mul 0 round CurrentX add
+	swap sin 2 mul 0 round CurrentY add
+
+# === ALIASES ===
+# They make CRPL nicer to work with
+# Not specific to this program
+
+:forin
+	GetListCount 0
+:el
+	I GetListElement
+:xy
+	dup 0 GetListElement swap 1 GetListElement
+:unitxy
+	dup CONST_COORDX GetUnitAttribute
+	swap CONST_COORDY GetUnitAttribute
+:exists
+	CONST_ISDESTROYED GetUnitAttribute not
+:inrange
+	swap ->impracticalvariablename
+	<-impracticalvariablename lt swap
+	<-impracticalvariablename gte and
+:cat
+	" " swap Concat Concat

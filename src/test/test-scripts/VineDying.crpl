@@ -1,0 +1,28 @@
+# VineDying.crpl
+# Created on: 8/6/2018 7:26:16 PM
+# ------------------------------------------
+
+#ClearTraceLog 1 SetPopupTextAlwaysVisible ShowTraceLog
+#<-Cells SetPopupText
+
+once
+	Self CONST_NULLIFIERDAMAGES 0 SetUnitAttribute
+	Self CONST_CREATEPZ 0 SetUnitAttribute
+	Self CONST_SUPPORTSDIGITALIS 0 SetUnitAttribute
+endonce
+
+if (GetTimer0 not)
+	0 <-Cells GetListCount RandInt ->i
+	<-Cells <-i GetListElement @xy dup2
+	0 SetDigitalis
+	0 SetDigitalisGrowth
+	<-Cells <-i RemoveListElement
+	if (<-Cells GetListCount 0 eq) Self 0 Destroy endif
+	27 23 RandInt SetTimer0
+endif
+
+# === ALIASES ===
+# They make CRPL nicer to work with
+
+:xy
+	dup 0 GetListElement swap 1 GetListElement

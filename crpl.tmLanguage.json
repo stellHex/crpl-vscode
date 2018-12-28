@@ -12,8 +12,8 @@
   "repository": {
     "function": {
       "name": "meta.func.crpl",
-      "begin": "(?i)((:destroyed|:awake|:GameLoaded|:ShowMessageDialogCallback|:UserCancelAction)\\b|(:[A-Za-z]\\w*))",
-      "end": "(?=:[A-Za-z])",
+      "begin": "(?i)((:destroyed|:awake|:GameLoaded|:ShowMessageDialogCallback|:UserCancelAction)\\b|(:\\w+))",
+      "end": "(?=:\\w)",
       "patterns": [{ "include": "#language" }],
       "beginCaptures": {
         "2": { "name": "entity.name.function.definition.event.crpl" },
@@ -22,7 +22,7 @@
     }, 
     "parameter": {
       "name": "variable.parameter.crpl",
-      "match": "\\$[A-Za-z]\\w*:(?=\\s*(-?\\d+\\.?\\d*|\"))"
+      "match": "\\$\\w+:(?=\\s*(-?\\d+\\.?\\d*|\"))"
     },
     "control": { "patterns": [{
         "name": "meta.block.simple.crpl",
@@ -108,12 +108,12 @@
         "match": "(?i)\\b(@destroyed|@awake|@GameLoaded|@ShowMessageDialogCallback|@UserCancelAction)\\b"
       }, {
         "name": "entity.name.function.call.user.crpl",
-        "match": "@[A-Za-z]\\w*\\b"
+        "match": "@\\w+\\b"
       }, {
         "match": "(--\\?|<-!|->!|-\\?!)",
         "name:": "keyword.operator.variable.crpl"
       }, {
-        "match": "(--|<-|->|-\\?)([A-Za-z]\\w*)",
+        "match": "(--|<-|->|-\\?)(\\w+)",
         "captures": {
           "1": { "name": "keyword.operator.variable.crpl" },
           "2": { "name": "variable.other.crpl" }

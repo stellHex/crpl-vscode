@@ -3,12 +3,16 @@
 # To use: add VineRoot.crpl a crpl core
 # ------------------------------------------
 
+# lint vars TargetUnitChance TargetUnitRadius TargetCannons
+# lint vars SplitChance
+# lint vars TargetId
+
 $GrowIntervalSeconds:2.0
 
 $TargetCommandNode:1 # (Boolean)
 
-$TargetX:-1
-$TargetY:-1
+$TargetX:-1 # lint hide
+$TargetY:-1 # lint hide d unread
 
 $TargetUnitChance:0.05
 # 0 = never, 1 = always

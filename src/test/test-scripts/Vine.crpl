@@ -16,6 +16,8 @@
 # <-Root <-GrowInterval @cat 
 # SetPopupText
 
+# lint vars root, currentcoords; lint vars growinterval targetcommandnode
+
 once
 	if (-?Next not) CreateList ->Next endif
 	# this if only necessary for reloading scripts

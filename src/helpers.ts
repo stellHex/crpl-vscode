@@ -19,9 +19,12 @@ export interface TokenMeta {
   comment?: string[] // documentation for function defs
   delta?: StackDelta // stack and type validation
   wiki?: boolean     // whether to look it up if hovered over
-  blockPredecessor?: RichToken // eg "if" or "else" for "endif"
-  blockSuccessor?: RichToken   // eg "else" or "endif" for "if"
-  suppressErrors?: boolean     // whether the erors and warnings have been suppressed via lint disable
+  blockPredecessor?: RichToken  // eg "if" or "else" for "endif"
+  blockSuccessor?: RichToken    // eg "else" or "endif" for "if"
+  // these next two are only necessary when the errors are via lint hide
+  // or when lint disabling errors which aren't added during the main first pass (such as in checkVariables)
+  notLinting?: boolean          // whether all errors and warnings have been suppressed 
+  disabledLints?: Set<string>   // exists if specific errors and warnings have been suppressed
 }
 
 export type ParseChunk = // TODO (maybe) convert main parser to be `ParseChunk[]`s instead of `[...ParseChunk]`s
@@ -259,6 +262,38 @@ export async function scrapeSignatures(groupSize: number = 10) {
     .replace( /\n [\[\]],?/g, '')
     .replace(/},?\n  {/g, ',\n')
   )
+}
+
+export const stackSpec = {
+  up: ['(', 'define', ':', 'func', 'do', 'once', 'if', 'else', 'while', 'repeat', 'comment', '"'],
+  down: new Map<string, string|RegExp>([
+    [')', '('],
+    ['define', 'start'], [':', 'define'], ['value', ':'],
+    ['func', /^(func|start|bottom)$/],
+    ['loop', 'do'],
+    ['endonce', 'once'],
+    ['else', 'if'],
+    ['endif', /^(if|else)$/],
+    ['repeat', 'while'],
+    ['endwhile', 'repeat'],
+    ['endcomment', 'comment'],
+    ['"', '"']
+  ]),
+  unmatched: new Map<string, 0|2>([
+    // number represents where the start of the block is
+    // inside the ParseTree in relation to the error'd token
+    // 0 = same token, eg ["once", [...]] -> "once" errors, its block starts at itself
+    // 2 = different token, eg ["if", [...], "else", [...]] -> "else" errors, its block starts at "if"
+    ['(', 0],
+    ['do', 0],
+    ['once', 0], 
+    ['if', 0],
+    ['else', 2],
+    ['while', 0],
+    ['repeat', 2],
+    ['comment', 0],
+    ['"', 0]
+  ]),
 }
 
 export function surely<T>(x: T) { return <Exclude<T, undefined|null>>x }

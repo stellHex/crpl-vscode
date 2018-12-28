@@ -6,32 +6,32 @@ import crplData = require('./crpl-data.json')
 import {
   RichToken, ParseTree, ParseBranch, ParseMode,
   VarTracker, FuncTracker,
-  scrapeSignatures, ParseChunk,
-  surely } from './helpers'
-import { getError, ParseContext } from './lint'
+  scrapeSignatures, // ParseChunk,
+  surely, stackSpec} from './helpers'
+import { getError, ParseContext, Linter } from './lint'
 
 const documents = new Map<string, RichDoc>()
 const diagnostics = vscode.languages.createDiagnosticCollection('crpl')
 
 const crplSelector: vscode.DocumentFilter = { language: 'crpl', scheme: 'file' }
-const tokenPattern = /(?:<-|->|-\?|--|@|:|\$)[A-Za-z]\w*\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/g
+const tokenPattern = /(?:(?:<-|->|-\?|--|@|\$)\w+|:[a-z]\w*)\b|-?\b\d+(?:\.\d*)?\b|(?:<-!|->!|-\?!|--\?)(?=\s|$)|\w+|\S/gi
 // note: this should be the same as language-configuration.json.wordPattern except with the addition of |\S
 const symbolPatterns = new Map([
-  ['read', /<-[A-Za-z]\w*\b/],
-  ['write', /->[A-Za-z]\w*\b/],
-  ['exists', /-\?[A-Za-z]\w*\b/],
-  ['delete', /--[A-Za-z]\w*\b/],
-  ['define', /\$[A-Za-z]\w*\b/],
-  ['call', /@[A-Za-z]\w*\b/],
-  ['func', /:\w[A-Za-z]\w*\b/],
-  ['refread', /<-!/],
-  ['refwrite', /->!/],
-  ['refexists', /-\?!/],
-  ['refdelete', /--\?/],
+  ['read', /^<-\w+\b$/],
+  ['write', /^->\w+\b$/],
+  ['exists', /^-\?\w+\b$/],
+  ['delete', /^--\w+\b$/],
+  ['define', /^\$\w+\b$/],
+  ['call', /^@\w+\b$/],
+  ['func', /^:\w+\b$/],
+  ['refread', /^<-!$/],
+  ['refwrite', /^->!$/],
+  ['refexists', /^-\?!$/],
+  ['refdelete', /^--\?$/],
 ])
 const prefixPatterns = [
-  /^(<-|->|--|-\?|\$)(?=[A-Za-z])/,
-  /^(:|@)(?=[A-Za-z])/
+  /^(<-|->|--|-\?|\$)(?=\w)/,
+  /^(:|@)(?=\w)/
 ]
 const docPattern = /=====\s*(.*)\s*=====\s*(.*\s*)*?.*Arguments.*\^\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|(.*?)\|(.*\s*)*?===\s*Description.*\s*((.*\s*)*)/
 
@@ -45,44 +45,15 @@ class RichDoc {
   static valuePattern = /"|-?\d+(\.\d*)?/
   static keyofVarTracker = /^(read|write|exists|delete)$/
   static keyofFuncTracker = /^(func|call)$/
-  static stackSpec = {
-    up: ['(', 'define', ':', 'func', 'do', 'once', 'if', 'else', 'while', 'repeat', 'comment', '"'],
-    down: new Map<string, string|RegExp>([
-      [')', '('],
-      ['define', 'start'], [':', 'define'], ['value', ':'],
-      ['func', /^(func|start|bottom)$/],
-      ['loop', 'do'],
-      ['endonce', 'once'],
-      ['else', 'if'],
-      ['endif', /^(if|else)$/],
-      ['repeat', 'while'],
-      ['endwhile', 'repeat'],
-      ['endcomment', 'comment'],
-      ['"', '"']
-    ]),
-    unmatched: new Map<string, 0|2>([
-      // number represents where the start of the block is
-      // inside the ParseTree in relation to the error'd token
-      // 0 = same token, eg ["once", [...]] -> "once" errors, its block starts at itself
-      // 2 = different token, eg ["if", [...], "else", [...]] -> "else" errors, its block starts at "if"
-      ['(', 0],
-      ['do', 0],
-      ['once', 0], 
-      ['if', 0],
-      ['else', 2],
-      ['while', 0],
-      ['repeat', 2],
-      ['comment', 0],
-      ['"', 0]
-    ]),
-  }
+  static stackSpec = stackSpec
   static startToken(): RichToken { return {
     token: '',
+    id: 'start',
     range: <vscode.Range>{
       start: <vscode.Position>{line: 0, character: 0},
       end: <vscode.Position>{line: 0, character: 0}
     },
-    meta: { }
+    meta: {}
   }}
 
   public doc: vscode.TextDocument
@@ -107,13 +78,14 @@ class RichDoc {
     this.vars.clear()
     this.funcs.clear()
 
-
     const spec = RichDoc.stackSpec
     const doc = this.doc
 
     const ctx: ParseContext = {
-      linting: true,
+      doc: this,
+      notLinting: false,
       disabledLints: new Set(),
+      tokens, lines, tree,
       branch: tree,
       parametric: true,
       mode: ParseMode.normal,
@@ -121,143 +93,13 @@ class RichDoc {
       exeStack: [],
       warpStack: []
     }
+    
+    const lint = new Linter(ctx)
 
     function addToken(rToken: RichToken, line: number) {
       tokens.push(rToken)
       ctx.branch.push(rToken)
       lines[line].push(rToken)
-    }
-
-    function checkUnnest(rToken: RichToken) {
-      let id = rToken.id
-      if (id && spec.down.get(id) && id !== '"') {
-        let top = rToken.meta.blockPredecessor || ctx.exeStack.pop()
-        let topid = top ? top.id : ctx.parametric ? 'start' : 'bottom'
-        let matcher = spec.down.get(id)
-        let matches = matcher instanceof RegExp ? matcher.test(<string>topid) : matcher === topid
-        if (matches) {
-          ctx.branch = ctx.branch.parent || ctx.branch
-          rToken.meta.blockPredecessor = top
-          if (top) { top.meta.blockSuccessor = rToken }
-        } else {
-          rToken.error = rToken.error || getError('bad-end-delim', id, rToken)
-          if (top) { ctx.exeStack.push(top) }
-        }
-      }
-    }
-    function checkNest(rToken: RichToken) {
-      let id = rToken.id
-      if (id && spec.up.indexOf(id) > -1) {
-        ctx.exeStack.push(rToken)
-        let newBranch = new ParseTree()
-        newBranch.start = rToken
-        ctx.branch.push(newBranch)
-        ctx.branch = newBranch
-      }
-    }
-
-    function checkWarp(warpToken: RichToken) {
-      if (warpToken.id === '(') {
-        let wsMember: ParseChunk[] = []
-        warp()
-        function pop() {
-          let result = ctx.branch.pop()
-          if (Array.isArray(result)) {
-            tokens.splice(tokens.lastIndexOf(<RichToken>(<ParseTree>result)[0]))
-          } else {
-            tokens.pop()
-          }
-          return result
-        }
-        function warp() {
-          if (ctx.branch.length) {
-            let prevToken = <RichToken>pop()
-            if (prevToken.id === 'endcomment') { // ignore comments
-              let body = <ParseTree>pop(), start = <RichToken>pop() 
-              wsMember.push([start, body, prevToken])
-              warp()
-            } else if (prevToken.id === '"') { // treat whole strings as one thing
-              let body = <ParseTree>pop(), start = <RichToken>pop()
-              warpFin([start, body, prevToken])
-            } else {
-              if(Array.isArray(ctx.branch[ctx.branch.length-1])){
-                ctx.branch = <ParseTree>ctx.branch[ctx.branch.length-1]
-              }
-              warpFin(prevToken)
-            }
-          } else {
-            ctx.branch = ctx.branch.parent || ctx.branch
-            warpFin(<RichToken>pop())
-          }
-        }
-        function warpFin(prev: ParseChunk) {
-          let realMember = wsMember.length ? wsMember : prev
-          wsMember.push(prev)
-          if (ctx.branch === tree && (
-            ctx.branch[ctx.branch.length-2] && (<RichToken>ctx.branch[ctx.branch.length-2]).id === ':'
-            || prev === tree[0])
-          ) {
-            warpToken.error = getError('warp-start')
-            unwarp(realMember)
-          } else {
-            ctx.warpStack.push(realMember)
-          }
-        }
-      }
-    }
-    function checkUnwarp(warpToken: RichToken) {
-      if (warpToken.id === ')') {
-        if (ctx.warpStack.length) {
-          let toUnwarp = <ParseChunk|ParseChunk[]>ctx.warpStack.pop()
-          unwarp(toUnwarp)
-        } else {
-          warpToken.error = getError('warp-start')
-        }
-      }
-    }
-    function unwarp(wsMember: ParseChunk|ParseChunk[]) {
-      if (Array.isArray(wsMember)) {
-        if (wsMember[1] instanceof ParseTree) {
-          (<ParseBranch[]>wsMember).forEach(push)
-        } else {
-          while (wsMember.length) {
-            unwarp(<ParseChunk|ParseChunk[]>wsMember.pop())
-          }
-        }
-      } else {
-        checkUnnest(wsMember)
-        push(wsMember)
-        checkNest(wsMember)
-      }
-      function push (b: ParseBranch) { tokens.push(...flatten(b)); ctx.branch.push(b) }
-      function flatten(br: ParseBranch) {
-        if (Array.isArray(br)) {
-          let result: RichToken[] = []
-          br.forEach(b => result.push(...flatten(b)))
-          return result
-        } else { return [br] }
-      }
-    }
-
-    function checkIJK(ijkToken: RichToken) {
-      let depth = ctx.exeStack.filter(rToken => rToken.id === 'do').length
-      if (ijkToken.id === 'i') {
-        if (depth === 0) {
-          ijkToken.error = getError('ijk', 'i')
-        }
-      } else if (ijkToken.id === 'j') {
-        if (depth < 2) {
-          ijkToken.error = getError('ijk', 'j')
-        }
-      } else if (ijkToken.id === 'k') {
-        if (depth === 0) {
-          ijkToken.error = getError('ijk', 'k')
-        } else if (depth === 1) {
-          ijkToken.error = getError('ijk', 'ik')
-        } else if (depth === 2) {
-          ijkToken.error = getError('ijk', 'jk')
-        }
-      }
     }
 
     doc.getText().split('\n').forEach((text, line) => {
@@ -280,16 +122,18 @@ class RichDoc {
                 if (token[0] === '$') {
                   id = 'define'
                   rToken.meta.var = token.toLowerCase().slice(1)
+                  rToken.meta.notLinting = ctx.notLinting
+                  rToken.meta.disabledLints = new Set(ctx.disabledLints)
                   this.getVar(rToken.meta.var).define.push(rToken)
                 } else { ctx.parametric = false }
               } else if (ctx.exeStack.length === 1 && ctx.exeStack[0].id === 'define') {
                 wiki = false
                 if (token === ':') { id = ':' }
-                else { error = getError('define', ':'); ctx.parametric = false } 
+                else { error = lint.getError('define', ':'); ctx.parametric = false } 
               } else if (ctx.exeStack.length === 1 && ctx.exeStack[0].id === ':') {
                 wiki = false
                 if (RichDoc.valuePattern.test(token)) { id = 'value'; wiki = false }
-                else { error = getError('define', 'value'); ctx.parametric = false }
+                else { error = lint.getError('define', 'value'); ctx.parametric = false }
                 if (token === '"') { ctx.mode = ParseMode.string }
               } else {
                 ctx.parametric = false
@@ -300,16 +144,25 @@ class RichDoc {
             }
             let lowerToken = token.toLowerCase()
             if (!ctx.parametric) {
-              if (token[0] === '$') { id = 'define'; error = getError('define-start') }
+              if (token[0] === '$') {
+                id = 'define'
+                // need to include these here since checkVariables takes place later
+                rToken.meta.notLinting = ctx.notLinting
+                rToken.meta.disabledLints = new Set(ctx.disabledLints)
+                error = lint.getError('definestart')
+              }
               else if (token === '"') { ctx.mode = ParseMode.string; id = token; wiki = false }
               else if (token === '(' || token === ')') { id = token; wiki = false }
               else if (crplData.words.indexOf(lowerToken) > -1) { id = lowerToken }
               else if (crplData.unitConstants.hasOwnProperty(lowerToken)) { id = lowerToken }
-              else if (/-?\d+(.\d*)?/.test(token)) { wiki = false }
+              else if (/^-?\d+(.\d*)?$/.test(token)) { wiki = false }
               else {
                 symbolPatterns.forEach((re, tokenType) => {
                   if (re.test(token)) {
                     id = tokenType
+                    // need to include these here since checkVariables and checkFunctions take place later
+                    rToken.meta.notLinting = ctx.notLinting
+                    rToken.meta.disabledLints = new Set(ctx.disabledLints) 
                     if (RichDoc.keyofVarTracker.test(id)) {
                       let name = lowerToken.slice(2)
                       rToken.meta.var = name
@@ -321,7 +174,7 @@ class RichDoc {
                     }
                   }
                 })
-                error = id ? undefined : getError('unknown')
+                error = id ? undefined : lint.getError('unknown')
                 wiki = !!id
               }
             }
@@ -329,13 +182,13 @@ class RichDoc {
 
           rToken.id = id; rToken.meta.wiki = wiki; rToken.error = error
 
-          checkUnnest(rToken)
-          checkWarp(rToken)
+          lint.checkUnnest(rToken)
+          lint.checkWarp(rToken)
           addToken(rToken, line)
-          checkUnwarp(rToken)
-          checkNest(rToken)
+          lint.checkUnwarp(rToken)
+          lint.checkNest(rToken)
 
-          checkIJK(rToken)
+          lint.checkIJK(rToken)
         } else if (ctx.mode === ParseMode.string) {
           if (ctx.parametric && ctx.exeStack.length === 0) {
             // awful hacks in order to preserve a simple RichDoc.stackSpec schema
@@ -356,7 +209,9 @@ class RichDoc {
             addToken({ token, range, id: 'string', meta: { } }, line)
           }
         } else if (ctx.mode === ParseMode.comment) {
-          addToken({ token, range, id: '#' + token, meta: { } }, line)
+          let rToken = { token, range, id: '#' + token, meta: {} }
+          lint.checkDirectives(rToken)
+          addToken(rToken, line)
         }
         // this.printTokens()
 
@@ -365,17 +220,19 @@ class RichDoc {
       if (ctx.mode === ParseMode.comment) {
         ctx.exeStack.pop()
         ctx.branch = ctx.branch.parent || ctx.branch
-        addToken({
+        let rToken = {
           token: '', id: 'endcomment', meta: { },
           range: new vscode.Range(line, text.length, line, text.length)
-        }, line)
+        }
+        lint.checkDirectives(rToken)
+        addToken(rToken, line)
         ctx.mode = ParseMode.normal
       }
     })
     // diagnose unresolved blocks
     ctx.exeStack.forEach(rToken => {
       if (rToken.id === 'func') {
-        rToken.error = ((ctx.exeStack.length > 1) || undefined) && getError('end-delim', 'func')
+        rToken.error = ((ctx.exeStack.length > 1) || undefined) && lint.getError('enddelim', 'func')
         return
       }
       if (rToken.error) { return }
@@ -383,7 +240,7 @@ class RichDoc {
       let startOffset = <0|2>spec.unmatched.get(<string>rToken.id)
       let errorToken = <RichToken>rToken.parent[rToken.parent.indexOf(rToken) - startOffset]
       if (errorToken.error) { return }
-      errorToken.error = getError('start-delim', rToken.id, errorToken)
+      errorToken.error = lint.getError('startdelim', rToken.id, errorToken)
     })
     this.checkVariables()
     this.checkFunctions()
@@ -402,18 +259,18 @@ class RichDoc {
       let writes = tracker.define.concat(tracker.write)
       let reads = tracker.read.concat(tracker.delete, tracker.exists)
       if (!writes.length) {
-        reads.forEach(rT => rT.warning = getError('no-write', undefined, rT))
+        reads.forEach(rT => rT.warning = getError('unwritten', undefined, rT))
       } else if (!reads.length) {
-        writes.forEach(rT => rT.warning = getError('no-read', undefined, rT))
+        writes.forEach(rT => rT.warning = getError('unread', undefined, rT))
       }
     })
   }
   checkFunctions() {
     this.funcs.forEach((tracker, name) => {
       if (tracker.func.length > 1) {
-        tracker.func.forEach(rT => rT.error = getError('multi-def', undefined, rT))
+        tracker.func.forEach(rT => rT.error = getError('multidef', undefined, rT))
       } else if (!tracker.func.length) {
-        tracker.call.forEach(rT => rT.error = getError('no-def', undefined, rT))
+        tracker.call.forEach(rT => rT.error = getError('nodef', undefined, rT))
       }
     })
   }
@@ -453,21 +310,29 @@ class RichDoc {
     let result: vscode.Diagnostic[] = []
     result.push(
       ...this.tokens.flat
-        .filter(t => t.error)
-        .map(t => {
-          let error = surely(t.error)
-          let diagnostic = new vscode.Diagnostic(t.range, error.message)
+        .filter(rT => {
+          return rT.error && !rT.meta.notLinting
+            && !(rT.meta.disabledLints && rT.meta.disabledLints.has(rT.error.code))
+        })
+        .map(rT => {
+          let error = surely(rT.error)
+          let diagnostic = new vscode.Diagnostic(rT.range, error.message)
           diagnostic.code = error.code
+          diagnostic.source = 'crpl'
           return diagnostic
         }),
       ...this.tokens.flat
-        .filter(t => t.warning)
-        .map(t => {
-          let warning = surely(t.warning)
-          let diagnostic = new vscode.Diagnostic(t.range, warning.message, vscode.DiagnosticSeverity.Warning )
+        .filter(rT => {
+          return rT.warning && !rT.meta.notLinting
+            && !(rT.meta.disabledLints && rT.meta.disabledLints.has(rT.warning.code))
+        })
+        .map(rT => {
+          let warning = surely(rT.warning)
+          let diagnostic = new vscode.Diagnostic(rT.range, warning.message, vscode.DiagnosticSeverity.Warning )
           diagnostic.code = warning.code
-          return diagnostic}
-        )
+          diagnostic.source = 'crpl'
+          return diagnostic
+        })
     )
     diagnostics.set(this.doc.uri, result)
   }
@@ -479,7 +344,7 @@ class RichDoc {
       if (Array.isArray(branch)) {
         return branch.map(niceTree)
       } else {
-        return f(branch) ? f(branch).toString() : branch
+        return f(branch) ? f(branch) : branch
       }
     }
     console.log({

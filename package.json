@@ -2,7 +2,7 @@
     "name": "crpl",
     "displayName": "CRPL Language Support",
     "description": "Syntax support for the scripting language from the game Creeper World 3",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "publisher": "knucracker-community",
     "repository": {
         "type": "git",

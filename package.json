@@ -19,6 +19,17 @@
     ],
     "main": "./out/extension",
     "contributes": {
+        "configuration": {
+            "title": "CRPL",
+            "properties": {
+                "crpl.live": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether or not to constantly check the syntax, or to wait until you save. Turn this option off if you're having problems with medium or large files."
+                }
+            }
+        },
         "languages": [
             {
                 "id": "crpl",
@@ -37,6 +48,13 @@
                 "language": "crpl",
                 "scopeName": "source.crpl",
                 "path": "./crpl.tmLanguage.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "crpl.toggleLiveSyntax",
+                "title": "CRPL: Toggle live syntax for this document",
+                "when": "editorLangId == crpl"
             }
         ]
     },

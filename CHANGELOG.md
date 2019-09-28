@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 Beta
+### Added
+- Option to set syntax check to happen on save
+
 ## 0.3.0 Beta
 ### Added
 - `Go to Definition`/`Find All References`/`Rename Symbol` support

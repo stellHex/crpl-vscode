@@ -244,7 +244,7 @@ class RichDoc {
     })
     this.checkVariables()
     this.checkFunctions()
-    this.printTokens()
+    // this.printTokens()
   } catch (err) { console.error(err); throw err }}
 
   checkVariables() {
@@ -404,6 +404,13 @@ function completionFilter(completionList: string[], rToken: RichToken, pattern: 
   })
 }
 
+function toggleSyntax(editor: vscode.TextEditor) {
+  let doc = editor.document
+  let config = vscode.workspace.getConfiguration('crpl', doc.uri)
+  let live = config.get('live')
+  config.update('live', !live)
+}
+
 function updateDoc (doc: vscode.TextDocument) {
   if (vscode.languages.match(crplSelector, doc)) {
     let rDoc = documents.get(doc.uri.fsPath)
@@ -419,13 +426,20 @@ function updateDoc (doc: vscode.TextDocument) {
   }
 }
 
+function updateDocMaybe (doc: vscode.TextDocument) {
+  let config = vscode.workspace.getConfiguration('crpl', doc.uri)
+  if (config.get('live')) { updateDoc(doc) }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   if (false) { scrapeSignatures() }
 
   vscode.workspace.textDocuments.forEach(updateDoc)
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument(updateDoc),
-    vscode.workspace.onDidChangeTextDocument(change => { updateDoc(change.document) }),
+    vscode.workspace.onDidChangeTextDocument(change => { updateDocMaybe(change.document) }),
+    vscode.workspace.onDidSaveTextDocument(updateDoc),
+    vscode.workspace.onDidChangeConfiguration(() => vscode.workspace.textDocuments.forEach(updateDoc)),
     vscode.workspace.onDidCloseTextDocument(doc => documents.delete(doc.uri.fsPath)),
 
     vscode.languages.registerHoverProvider(crplSelector, {
@@ -541,6 +555,8 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     }),
+
+    vscode.commands.registerTextEditorCommand('crpl.toggleLiveSyntax', toggleSyntax)
   )
 }
 
